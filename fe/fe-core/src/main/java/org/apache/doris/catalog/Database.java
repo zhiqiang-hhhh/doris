@@ -18,7 +18,6 @@
 package org.apache.doris.catalog;
 
 import org.apache.doris.catalog.TableIf.TableType;
-import org.apache.doris.cluster.ClusterNamespace;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.DdlException;
@@ -758,14 +757,6 @@ public class Database extends MetaObject implements Writable, DatabaseIf<Table> 
         return FunctionUtil.getFunctions(name2Function);
     }
 
-    public boolean isInfoSchemaDb() {
-        return ClusterNamespace.getNameFromFullName(fullQualifiedName).equalsIgnoreCase(InfoSchemaDb.DATABASE_NAME);
-    }
-
-    public boolean isMysqlDb() {
-        return ClusterNamespace.getNameFromFullName(fullQualifiedName).equalsIgnoreCase(MysqlDb.DATABASE_NAME);
-    }
-
     public synchronized void addEncryptKey(EncryptKey encryptKey, boolean ifNotExists) throws UserException {
         if (addEncryptKeyImpl(encryptKey, false, ifNotExists)) {
             Env.getCurrentEnv().getEditLog().logAddEncryptKey(encryptKey);
@@ -907,4 +898,9 @@ public class Database extends MetaObject implements Writable, DatabaseIf<Table> 
     public String toString() {
         return toJson();
     }
+
+    public boolean isMysqlCompatibleDatabase() {
+        return false;
+    }
+
 }
