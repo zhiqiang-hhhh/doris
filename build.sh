@@ -51,6 +51,10 @@ Usage: $0 <options>
      --clean                clean and build target
      --output               specify the output directory
      -j                     build Backend parallel
+     --debug                build debug Doris.
+     --share                build shared Doris.
+     --offline              build Frontend in offline mode.
+     
 
   Environment variables:
     USE_AVX2                    If the CPU does not support AVX2 instruction set, please set USE_AVX2=0. Default is ON.
@@ -60,10 +64,13 @@ Usage: $0 <options>
   Eg.
     $0                                      build all
     $0 --be                                 build Backend
+    $0 --be --debug                         build Backend in debug
+    $0 --be --share                         build Backend in share
     $0 --meta-tool                          build Backend meta tool
     $0 --index-tool                         build Backend inverted index tool
     $0 --fe --clean                         clean and build Frontend and Spark Dpp application
     $0 --fe --be --clean                    clean and build Frontend, Spark Dpp application and Backend
+    $0 --fe --offline                       build fe in offline
     $0 --spark-dpp                          build Spark DPP application alone
     $0 --broker                             build Broker
     $0 --be --fe                            build Backend, Frontend, Spark Dpp application and Java UDF library
@@ -128,6 +135,10 @@ if ! OPTS="$(getopt \
     -l 'help' \
     -l 'output:' \
     -o 'hj:' \
+    -l 'sync' \
+    -l 'debug' \
+    -l 'share' \
+    -l 'offline' \
     -- "$@")"; then
     usage
 fi
@@ -149,6 +160,8 @@ HELP=0
 PARAMETER_COUNT="$#"
 PARAMETER_FLAG=0
 DENABLE_CLANG_COVERAGE='OFF'
+DEBUG=0
+OFFLINE=0
 if [[ "$#" == 1 ]]; then
     # default
     BUILD_FE=1
@@ -161,6 +174,9 @@ if [[ "$#" == 1 ]]; then
     BUILD_HIVE_UDF=1
     BUILD_BE_JAVA_EXTENSIONS=1
     CLEAN=0
+    DEBUG=0
+    OFFLINE=0
+    SHARE=0
 else
     while true; do
         case "$1" in
@@ -229,6 +245,18 @@ else
             DORIS_OUTPUT="$2"
             shift 2
             ;;
+        --debug)
+            DEBUG=1
+            shift
+            ;;
+        --share)
+            SHARE=1
+            shift
+            ;;        
+        --offline)
+            OFFLINE=1
+            shift
+            ;;
         --)
             shift
             break
@@ -257,6 +285,7 @@ fi
 if [[ "${HELP}" -eq 1 ]]; then
     usage
 fi
+
 # build thirdparty libraries if necessary
 if [[ ! -f "${DORIS_THIRDPARTY}/installed/lib/libbacktrace.a" ]]; then
     echo "Thirdparty libraries need to be build ..."
@@ -423,6 +452,9 @@ echo "Get params:
     DENABLE_CLANG_COVERAGE      -- ${DENABLE_CLANG_COVERAGE}
     DISPLAY_BUILD_TIME          -- ${DISPLAY_BUILD_TIME}
     ENABLE_PCH                  -- ${ENABLE_PCH}
+    DEBUG                       -- ${DEBUG}
+    SHARE                       -- ${SHARE}
+    OFFLINE                     -- ${OFFLINE}
 "
 
 # Clean and build generated code
@@ -469,8 +501,15 @@ if [[ "${BUILD_BE}" -eq 1 ]]; then
     if [[ -e "${DORIS_HOME}/gensrc/build/gen_cpp/version.h" ]]; then
         rm -f "${DORIS_HOME}/gensrc/build/gen_cpp/version.h"
     fi
-    CMAKE_BUILD_TYPE="${BUILD_TYPE:-Release}"
-    echo "Build Backend: ${CMAKE_BUILD_TYPE}"
+
+    if [[ ${DEBUG} -eq 1 ]] ; then
+        CMAKE_BUILD_TYPE=${BUILD_TYPE:-Debug}
+        CMAKE_DEBUG_BUILD_PARAMS=-DCMAKE_CXX_FLAGS="-fno-limit-debug-info"
+    else
+        CMAKE_BUILD_TYPE=${BUILD_TYPE:-Release}
+    fi
+
+    echo "Build Backend${SHARE:+" (Shared Build)"}: ${CMAKE_BUILD_TYPE}"
     CMAKE_BUILD_DIR="${DORIS_HOME}/be/build_${CMAKE_BUILD_TYPE}"
     if [[ "${CLEAN}" -eq 1 ]]; then
         clean_be
@@ -489,6 +528,7 @@ if [[ "${BUILD_BE}" -eq 1 ]]; then
     mkdir -p "${CMAKE_BUILD_DIR}"
     cd "${CMAKE_BUILD_DIR}"
     "${CMAKE_CMD}" -G "${GENERATOR}" \
+        $CMAKE_DEBUG_BUILD_PARAMS \
         -DCMAKE_MAKE_PROGRAM="${MAKE_PROGRAM}" \
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
         -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" \
@@ -561,9 +601,9 @@ function build_ui() {
 }
 
 # FE UI must be built before building FE
-if [[ "${BUILD_FE}" -eq 1 ]]; then
-    build_ui
-fi
+# if [[ "${BUILD_FE}" -eq 1 ]]; then
+#     build_ui
+# fi
 
 # Clean and build Frontend
 if [[ "${FE_MODULES}" != '' ]]; then
@@ -572,10 +612,17 @@ if [[ "${FE_MODULES}" != '' ]]; then
     if [[ "${CLEAN}" -eq 1 ]]; then
         clean_fe
     fi
-    if [[ "${DISABLE_JAVA_CHECK_STYLE}" = "ON" ]]; then
-        "${MVN_CMD}" package -pl ${FE_MODULES:+${FE_MODULES}} -Dskip.doc=true -DskipTests -Dcheckstyle.skip=true
+
+    if [ ${OFFLINE} -eq 1 ]; then
+		echo "build fe in offline"
     else
-        "${MVN_CMD}" package -pl ${FE_MODULES:+${FE_MODULES}} -Dskip.doc=true -DskipTests
+		echo "build fe in online"
+    fi
+
+    if [[ "${DISABLE_JAVA_CHECK_STYLE}" = "ON" ]]; then
+        "${MVN_CMD}" package ${OFFLINE:+"--offline"} -pl ${FE_MODULES:+${FE_MODULES}} -Dskip.doc=true -DskipTests -Dcheckstyle.skip=true
+    else
+        "${MVN_CMD}" package ${OFFLINE:+"--offline"} -pl ${FE_MODULES:+${FE_MODULES}} -Dskip.doc=true -DskipTests
     fi
     cd "${DORIS_HOME}"
 fi
