@@ -306,8 +306,6 @@ struct Checker {
         ;
 
 int main(int argc, char** argv) {
-    doris::signal::InstallFailureSignalHandler();
-    doris::init_signals();
     // create StackTraceCache Instance, at the beginning, other static destructors may use.
     StackTrace::createCache();
 
@@ -440,8 +438,15 @@ int main(int argc, char** argv) {
         if (!status.ok()) {
             LOG(WARNING) << "Failed to initialize JNI: " << status;
             exit(1);
+        } else {
+            LOG(INFO) << "Doris backend JNI is initialized.";
         }
     }
+
+    // Doris own signal handler must be register after jvm is init.
+    // Or our own sig-handler will be overwriten ...
+    doris::signal::InstallFailureSignalHandler();
+    doris::init_signals();
 
     // ATTN: MUST init before `ExecEnv`, `StorageEngine` and other daemon services
     //
