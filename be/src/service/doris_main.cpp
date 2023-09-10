@@ -306,6 +306,7 @@ struct Checker {
         ;
 
 int main(int argc, char** argv) {
+    doris::signal::InstallFailureSignalHandler();
     // create StackTraceCache Instance, at the beginning, other static destructors may use.
     StackTrace::createCache();
 
@@ -445,7 +446,6 @@ int main(int argc, char** argv) {
 
     // Doris own signal handler must be register after jvm is init.
     // Or our own sig-handler will be overwriten ...
-    doris::signal::InstallFailureSignalHandler();
     doris::init_signals();
 
     // ATTN: MUST init before `ExecEnv`, `StorageEngine` and other daemon services
