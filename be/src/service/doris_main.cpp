@@ -446,6 +446,7 @@ int main(int argc, char** argv) {
 
     // Doris own signal handler must be register after jvm is init.
     // Or our own sig-handler will be overwriten ...
+    // https://www.oracle.com/java/technologies/javase/signals.html
     doris::init_signals();
 
     // ATTN: MUST init before `ExecEnv`, `StorageEngine` and other daemon services
