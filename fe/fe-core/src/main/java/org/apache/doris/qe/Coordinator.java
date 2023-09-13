@@ -528,13 +528,18 @@ public class Coordinator {
 
         this.idToBackend = Env.getCurrentSystemInfo().getIdToBackend();
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Query {} idToBackend size={}", DebugUtil.printId(queryId), idToBackend.size());
+            int backendNum = idToBackend.size();
+            StringBuilder backendInfos = new StringBuilder("backends info:");
             for (Map.Entry<Long, Backend> entry : idToBackend.entrySet()) {
                 Long backendID = entry.getKey();
                 Backend backend = entry.getValue();
-                LOG.debug("Query {}, backend: {}-{}-{}-{}", DebugUtil.printId(queryId),
-                                    backendID, backend.getHost(), backend.getBePort(), backend.getProcessEpoch());
+                backendInfos.append(' ').append(backendID).append("-")
+                            .append(backend.getHost()).append("-")
+                            .append(backend.getBePort()).append("-")
+                            .append(backend.getProcessEpoch());
             }
+            LOG.debug("query {}, backend size: {}, {}",
+                    DebugUtil.printId(queryId), backendNum, backendInfos.toString());
         }
     }
 
@@ -624,7 +629,7 @@ public class Coordinator {
             receiver = new ResultReceiver(queryId, topParams.instanceExecParams.get(0).instanceId,
                     addressToBackendID.get(execBeAddr), toBrpcHost(execBeAddr), this.timeoutDeadline);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("dispatch query job: {} to {}", DebugUtil.printId(queryId),
+                LOG.debug("dispatch result receiver of query {} to {}", DebugUtil.printId(queryId),
                         topParams.instanceExecParams.get(0).host);
             }
 
@@ -855,7 +860,8 @@ public class Coordinator {
                     }
                 }
 
-                // 3. group BackendExecState by BE. So that we can use one RPC to send all fragment instances of a BE.
+                // 3. group PipelineExecContext by BE.
+                // So that we can use one RPC to send all fragment instances of a BE.
                 for (Map.Entry<TNetworkAddress, TPipelineFragmentParams> entry : tParams.entrySet()) {
                     Long backendId = this.addressToBackendID.get(entry.getKey());
                     PipelineExecContext pipelineExecContext = new PipelineExecContext(fragment.getFragmentId(),
@@ -903,6 +909,16 @@ public class Coordinator {
                     span = ConnectContext.get().getTracer().spanBuilder("execRemoteFragmentsAsync")
                             .setParent(parentSpanContext).setSpanKind(SpanKind.CLIENT).startSpan();
                 }
+
+                if (LOG.isDebugEnabled()) {
+                    String infos = "";
+                    for (PipelineExecContext pec : ctxs.ctxs) {
+                        infos += pec.fragmentId + " ";
+                    }
+                    LOG.debug("query {}, sending pipeline fragments: {} to be {} bprc address {}",
+                            DebugUtil.printId(queryId), infos, ctxs.beId, ctxs.brpcAddr.toString());
+                }
+
                 ctxs.scopedSpan = new ScopedSpan(span);
                 ctxs.unsetFields();
                 BackendServiceProxy proxy = BackendServiceProxy.getInstance();
@@ -1047,12 +1063,12 @@ public class Coordinator {
                         case TIMEOUT:
                             MetricRepo.BE_COUNTER_QUERY_RPC_FAILED.getOrAdd(triple.getLeft().brpcAddr.hostname)
                                     .increase(1L);
-                            throw new RpcException(triple.getLeft().brpcAddr.hostname, errMsg, exception);
+                            throw new RpcException(triple.getLeft().brpcAddr.toString(), errMsg, exception);
                         case THRIFT_RPC_ERROR:
                             MetricRepo.BE_COUNTER_QUERY_RPC_FAILED.getOrAdd(triple.getLeft().brpcAddr.hostname)
                                     .increase(1L);
                             SimpleScheduler.addToBlacklist(triple.getLeft().beId, errMsg);
-                            throw new RpcException(triple.getLeft().brpcAddr.hostname, errMsg, exception);
+                            throw new RpcException(triple.getLeft().brpcAddr.toString(), errMsg, exception);
                         default:
                             throw new UserException(errMsg, exception);
                     }
@@ -2315,10 +2331,9 @@ public class Coordinator {
             if (LOG.isDebugEnabled()) {
                 StringBuilder builder = new StringBuilder();
                 ctx.printProfile(builder);
-                LOG.debug("profile for query_id={} instance_id={}\n{}",
+                LOG.debug("profile for query_id={} instance_id={}",
                         DebugUtil.printId(queryId),
-                        DebugUtil.printId(params.getFragmentInstanceId()),
-                        builder.toString());
+                        DebugUtil.printId(params.getFragmentInstanceId()));
             }
 
             Status status = new Status(params.status);
@@ -2326,9 +2341,11 @@ public class Coordinator {
             // and returned_all_results_ is true.
             // (UpdateStatus() initiates cancellation, if it hasn't already been initiated)
             if (!(returnedAllResults && status.isCancelled()) && !status.ok()) {
-                LOG.warn("one instance report fail, query_id={} instance_id={}, error message: {}",
-                        DebugUtil.printId(queryId), DebugUtil.printId(params.getFragmentInstanceId()),
-                        status.getErrorMsg());
+                LOG.warn("one instance report fail, query_id={} fragment_id={} instance_id={}, be={},"
+                                  + " error message: {}",
+                        DebugUtil.printId(queryId), params.getFragmentId(),
+                        DebugUtil.printId(params.getFragmentInstanceId()),
+                        params.getBackendId(), status.getErrorMsg());
                 updateStatus(status, params.getFragmentInstanceId());
             }
             if (ctx.fragmentInstancesMap.get(params.fragment_instance_id).getIsDone()) {
