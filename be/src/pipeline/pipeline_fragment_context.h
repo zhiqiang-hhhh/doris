@@ -39,6 +39,9 @@
 #include "util/runtime_profile.h"
 #include "util/stopwatch.hpp"
 
+#define VLOG_WITHQUERYID_CRITICAL VLOG_CRITICAL << "query " << print_id(_query_id) << " "
+#define VLOG_WITHQUERYID_FILE VLOG_FILE << "query " << print_id(_query_id) << " "
+
 namespace doris {
 class ExecNode;
 class DataSink;
