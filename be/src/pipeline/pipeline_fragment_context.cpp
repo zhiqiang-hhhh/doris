@@ -451,7 +451,7 @@ void PipelineFragmentContext::trigger_report_if_necessary() {
                 // _runtime_state->load_channel_profile()->compute_time_in_profile(); // TODO load channel profile add timer
                 _runtime_state->load_channel_profile()->pretty_print(&ss);
             }
-            VLOG_FILE << ss.str();
+            VLOG_FILE << "query " << print_id(get_query_id()) << ss.str();
         }
         auto st = send_report(false);
         if (!st.ok()) {
