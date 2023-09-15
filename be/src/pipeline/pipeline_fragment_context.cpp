@@ -377,6 +377,7 @@ Status PipelineFragmentContext::_build_pipeline_tasks(
         _runtime_profile->add_child(pipeline->pipeline_profile(), true, nullptr);
     }
     g_pipeline_tasks_count << _total_tasks;
+    LOG_INFO("Instance {} has {} pipeline tasks.", print_id(_fragment_instance_id), _tasks.size());
     for (auto& task : _tasks) {
         RETURN_IF_ERROR(task->prepare(_runtime_state.get()));
     }
@@ -446,7 +447,7 @@ void PipelineFragmentContext::trigger_report_if_necessary() {
                 // _runtime_state->load_channel_profile()->compute_time_in_profile(); // TODO load channel profile add timer
                 _runtime_state->load_channel_profile()->pretty_print(&ss);
             }
-            VLOG_FILE << ss.str();
+            VLOG_FILE << "query " << print_id(get_query_id()) << ss.str();
         }
         auto st = send_report(false);
         if (!st.ok()) {
@@ -457,8 +458,12 @@ void PipelineFragmentContext::trigger_report_if_necessary() {
     }
 }
 
+// Traverse ExecNode tree to construct a operator tree.
+// Operator tree is different from ExecNode tree, because
+// operator tree will be seperated to multiple pipelines,
+// and each pipeline is assembled by many operators.
 // TODO: use virtual function to do abstruct
-Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur_pipe) {
+Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur_pipeline) {
     auto node_type = node->type();
     switch (node_type) {
     // for source
@@ -471,7 +476,7 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
     case TPlanNodeType::ES_HTTP_SCAN_NODE:
     case TPlanNodeType::ES_SCAN_NODE: {
         OperatorBuilderPtr operator_t = std::make_shared<ScanOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(operator_t));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(operator_t));
         break;
     }
     case TPlanNodeType::MYSQL_SCAN_NODE: {
@@ -488,24 +493,24 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
     case TPlanNodeType::SCHEMA_SCAN_NODE: {
         OperatorBuilderPtr operator_t =
                 std::make_shared<SchemaScanOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(operator_t));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(operator_t));
         break;
     }
     case TPlanNodeType::EXCHANGE_NODE: {
         OperatorBuilderPtr operator_t =
                 std::make_shared<ExchangeSourceOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(operator_t));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(operator_t));
         break;
     }
     case TPlanNodeType::EMPTY_SET_NODE: {
         OperatorBuilderPtr operator_t =
                 std::make_shared<EmptySetSourceOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(operator_t));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(operator_t));
         break;
     }
     case TPlanNodeType::DATA_GEN_SCAN_NODE: {
         OperatorBuilderPtr operator_t = std::make_shared<DataGenOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(operator_t));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(operator_t));
         break;
     }
     case TPlanNodeType::UNION_NODE: {
@@ -514,7 +519,7 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
             union_node->get_first_materialized_child_idx() == 0) { // only have const expr
             OperatorBuilderPtr builder =
                     std::make_shared<ConstValueOperatorBuilder>(node->id(), node);
-            RETURN_IF_ERROR(cur_pipe->add_operator(builder));
+            RETURN_IF_ERROR(cur_pipeline->add_operator(builder));
         } else {
             int child_count = union_node->children_count();
             auto data_queue = std::make_shared<DataQueue>(child_count);
@@ -527,7 +532,7 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
             }
             OperatorBuilderPtr source_builder = std::make_shared<UnionSourceOperatorBuilder>(
                     node->id(), union_node, data_queue);
-            RETURN_IF_ERROR(cur_pipe->add_operator(source_builder));
+            RETURN_IF_ERROR(cur_pipeline->add_operator(source_builder));
         }
         break;
     }
@@ -545,7 +550,7 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
             OperatorBuilderPtr pre_agg_source =
                     std::make_shared<DistinctStreamingAggSourceOperatorBuilder>(
                             node->id(), agg_node, data_queue);
-            RETURN_IF_ERROR(cur_pipe->add_operator(pre_agg_source));
+            RETURN_IF_ERROR(cur_pipeline->add_operator(pre_agg_source));
         } else if (agg_node->is_streaming_preagg()) {
             auto data_queue = std::make_shared<DataQueue>(1);
             OperatorBuilderPtr pre_agg_sink = std::make_shared<StreamingAggSinkOperatorBuilder>(
@@ -554,7 +559,7 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
 
             OperatorBuilderPtr pre_agg_source = std::make_shared<StreamingAggSourceOperatorBuilder>(
                     node->id(), agg_node, data_queue);
-            RETURN_IF_ERROR(cur_pipe->add_operator(pre_agg_source));
+            RETURN_IF_ERROR(cur_pipeline->add_operator(pre_agg_source));
         } else {
             OperatorBuilderPtr agg_sink =
                     std::make_shared<AggSinkOperatorBuilder>(node->id(), agg_node);
@@ -562,7 +567,7 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
 
             OperatorBuilderPtr agg_source =
                     std::make_shared<AggSourceOperatorBuilder>(node->id(), agg_node);
-            RETURN_IF_ERROR(cur_pipe->add_operator(agg_source));
+            RETURN_IF_ERROR(cur_pipeline->add_operator(agg_source));
         }
         break;
     }
@@ -575,7 +580,7 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
 
         OperatorBuilderPtr sort_source =
                 std::make_shared<SortSourceOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(sort_source));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(sort_source));
         break;
     }
     case TPlanNodeType::PARTITION_SORT_NODE: {
@@ -588,7 +593,7 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
 
         OperatorBuilderPtr partition_sort_source =
                 std::make_shared<PartitionSortSourceOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(partition_sort_source));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(partition_sort_source));
         break;
     }
     case TPlanNodeType::ANALYTIC_EVAL_NODE: {
@@ -601,27 +606,27 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
 
         OperatorBuilderPtr analytic_source =
                 std::make_shared<AnalyticSourceOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(analytic_source));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(analytic_source));
         break;
     }
     case TPlanNodeType::REPEAT_NODE: {
-        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipe));
+        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipeline));
         OperatorBuilderPtr builder = std::make_shared<RepeatOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(builder));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(builder));
         break;
     }
     case TPlanNodeType::ASSERT_NUM_ROWS_NODE: {
-        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipe));
+        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipeline));
         OperatorBuilderPtr builder =
                 std::make_shared<AssertNumRowsOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(builder));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(builder));
         break;
     }
     case TPlanNodeType::TABLE_FUNCTION_NODE: {
-        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipe));
+        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipeline));
         OperatorBuilderPtr builder =
                 std::make_shared<TableFunctionOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(builder));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(builder));
         break;
     }
     case TPlanNodeType::HASH_JOIN_NODE: {
@@ -638,12 +643,12 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
                 std::make_shared<HashJoinBuildSinkBuilder>(node->id(), join_node);
         RETURN_IF_ERROR(new_pipe->set_sink_builder(join_sink));
 
-        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipe));
+        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipeline));
         OperatorBuilderPtr join_source =
                 std::make_shared<HashJoinProbeOperatorBuilder>(node->id(), join_node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(join_source));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(join_source));
 
-        cur_pipe->add_dependency(new_pipe);
+        cur_pipeline->add_dependency(new_pipe);
         break;
     }
     case TPlanNodeType::CROSS_JOIN_NODE: {
@@ -653,26 +658,26 @@ Status PipelineFragmentContext::_build_pipelines(ExecNode* node, PipelinePtr cur
                 std::make_shared<NestLoopJoinBuildOperatorBuilder>(node->id(), node);
         RETURN_IF_ERROR(new_pipe->set_sink_builder(join_sink));
 
-        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipe));
+        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipeline));
         OperatorBuilderPtr join_source =
                 std::make_shared<NestLoopJoinProbeOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(join_source));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(join_source));
 
-        cur_pipe->add_dependency(new_pipe);
+        cur_pipeline->add_dependency(new_pipe);
         break;
     }
     case TPlanNodeType::INTERSECT_NODE: {
-        RETURN_IF_ERROR(_build_operators_for_set_operation_node<true>(node, cur_pipe));
+        RETURN_IF_ERROR(_build_operators_for_set_operation_node<true>(node, cur_pipeline));
         break;
     }
     case TPlanNodeType::EXCEPT_NODE: {
-        RETURN_IF_ERROR(_build_operators_for_set_operation_node<false>(node, cur_pipe));
+        RETURN_IF_ERROR(_build_operators_for_set_operation_node<false>(node, cur_pipeline));
         break;
     }
     case TPlanNodeType::SELECT_NODE: {
-        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipe));
+        RETURN_IF_ERROR(_build_pipelines(node->child(0), cur_pipeline));
         OperatorBuilderPtr builder = std::make_shared<SelectOperatorBuilder>(node->id(), node);
-        RETURN_IF_ERROR(cur_pipe->add_operator(builder));
+        RETURN_IF_ERROR(cur_pipeline->add_operator(builder));
         break;
     }
     default:
@@ -708,6 +713,7 @@ Status PipelineFragmentContext::_build_operators_for_set_operation_node(ExecNode
             std::make_shared<SetSourceOperatorBuilder<is_intersect>>(node->id(), node);
     return cur_pipe->add_operator(source_builder);
 }
+
 
 Status PipelineFragmentContext::submit() {
     if (_submitted) {

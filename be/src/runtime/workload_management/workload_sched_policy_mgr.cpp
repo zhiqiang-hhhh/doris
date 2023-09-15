@@ -83,7 +83,6 @@ void WorkloadSchedPolicyMgr::_schedule_workload() {
         if (list.size() == 0) {
             continue;
         }
-
         for (int i = 0; i < list.size(); i++) {
             WorkloadQueryInfo* query_info_ptr = &(list[i]);
             _exec_env->runtime_query_statistics_mgr()->get_metric_map(query_info_ptr->query_id,
@@ -109,7 +108,7 @@ void WorkloadSchedPolicyMgr::_schedule_workload() {
             if (matched_policy_map.size() == 0) {
                 continue;
             }
-            LOG(INFO) << "[workload_schedule] matched policy size=" << matched_policy_map.size();
+
             // 3 check action conflicts
             if (matched_policy_map.find(WorkloadActionType::MOVE_QUERY_TO_GROUP) !=
                         matched_policy_map.end() &&

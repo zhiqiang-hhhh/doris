@@ -2587,12 +2587,10 @@ public class Coordinator implements CoordInterface {
             if (LOG.isDebugEnabled()) {
                 StringBuilder builder = new StringBuilder();
                 ctx.printProfile(builder);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("profile for query_id={} instance_id={}\n{}",
-                            DebugUtil.printId(queryId),
-                            DebugUtil.printId(params.getFragmentInstanceId()),
-                            builder.toString());
-                }
+                LOG.debug("profile for query_id={} instance_id={}\n{}",
+                        DebugUtil.printId(queryId),
+                        DebugUtil.printId(params.getFragmentInstanceId()),
+                        builder.toString());
             }
 
             Status status = new Status(params.status);
