@@ -133,3 +133,7 @@ lru_cache_test
 
 # other
 compile_commands.json
+
+regression-test/data/usercases
+regression-test/suites/usercases
+tools/tpch-tools/bin/tpch-data
