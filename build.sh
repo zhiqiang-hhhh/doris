@@ -376,13 +376,17 @@ if [[ -z "${USE_UNWIND}" ]]; then
     fi
 fi
 
-if [[ -z "${DISPLAY_BUILD_TIME}" ]]; then
-    DISPLAY_BUILD_TIME='OFF'
-fi
+DISPLAY_BUILD_TIME='ON'
+# if [[ -z "${DISPLAY_BUILD_TIME}" ]]; then
+#     DISPLAY_BUILD_TIME='OFF'
+# fi
 
-if [[ -z "${OUTPUT_BE_BINARY}" ]]; then
-    OUTPUT_BE_BINARY=${BUILD_BE}
-fi
+# 永远不 copy be 二进制
+OUTPUT_BE_BINARY='OFF'
+
+# if [[ -z "${OUTPUT_BE_BINARY}" ]]; then
+#     OUTPUT_BE_BINARY=${BUILD_BE}
+# fi
 
 if [[ -n "${DISABLE_BE_JAVA_EXTENSIONS}" ]]; then
     if [[ "${DISABLE_BE_JAVA_EXTENSIONS}" == "ON" ]]; then
@@ -540,10 +544,9 @@ if [[ "${BUILD_BE}" -eq 1 ]]; then
         -DDORIS_JAVA_HOME="${JAVA_HOME}" \
         "${DORIS_HOME}/be"
 
-    if [[ "${OUTPUT_BE_BINARY}" -eq 1 ]]; then
-        "${BUILD_SYSTEM}" -j "${PARALLEL}"
-        "${BUILD_SYSTEM}" install
-    fi
+        "${BUILD_SYSTEM}" -j "${PARALLEL}"    
+        # 不要 install，这样确保 workspace 的 debug 跟 release 可以使用软连接到不同的二进制
+        # "${BUILD_SYSTEM}" install
 
     cd "${DORIS_HOME}"
 fi
@@ -620,10 +623,10 @@ function build_ui() {
     cp -r "${ui_dist}"/* "${DORIS_HOME}/fe/fe-core/src/main/resources/static"/
 }
 
-# FE UI must be built before building FE
-if [[ "${BUILD_FE}" -eq 1 ]]; then
-    build_ui
-fi
+# # FE UI must be built before building FE
+# if [[ "${BUILD_FE}" -eq 1 ]]; then
+#     build_ui
+# fi
 
 # Clean and build Frontend
 if [[ "${FE_MODULES}" != '' ]]; then

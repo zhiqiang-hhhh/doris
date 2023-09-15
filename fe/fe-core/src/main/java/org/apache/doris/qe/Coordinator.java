@@ -903,12 +903,12 @@ public class Coordinator implements CoordInterface {
                     needCheckBackendState = true;
                 }
 
-                Map<TUniqueId, RuntimeProfile> fragmentInstancesMap = new HashMap<TUniqueId, RuntimeProfile>();
+                Map<TUniqueId, RuntimeProfile> profileHashMap = new HashMap<TUniqueId, RuntimeProfile>();
                 for (Map.Entry<TNetworkAddress, TPipelineFragmentParams> entry : tParams.entrySet()) {
                     for (TPipelineInstanceParams instanceParam : entry.getValue().local_params) {
                         String name = "Instance " + DebugUtil.printId(instanceParam.fragment_instance_id)
                                 + " (host=" + entry.getKey() + ")";
-                        fragmentInstancesMap.put(instanceParam.fragment_instance_id, new RuntimeProfile(name));
+                        profileHashMap.put(instanceParam.fragment_instance_id, new RuntimeProfile(name));
                     }
                 }
 
@@ -918,7 +918,7 @@ public class Coordinator implements CoordInterface {
                 for (Map.Entry<TNetworkAddress, TPipelineFragmentParams> entry : tParams.entrySet()) {
                     Long backendId = this.addressToBackendID.get(entry.getKey());
                     PipelineExecContext pipelineExecContext = new PipelineExecContext(fragment.getFragmentId(),
-                            profileFragmentId, entry.getValue(), backendId, fragmentInstancesMap,
+                            profileFragmentId, entry.getValue(), backendId, profileHashMap,
                             executionProfile.getLoadChannelProfile(), this.enablePipelineXEngine,
                             this.executionProfile);
                     // Each tParam will set the total number of Fragments that need to be executed on the same BE,
@@ -2477,12 +2477,10 @@ public class Coordinator implements CoordInterface {
             if (LOG.isDebugEnabled()) {
                 StringBuilder builder = new StringBuilder();
                 ctx.printProfile(builder);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("profile for query_id={} instance_id={}\n{}",
-                            DebugUtil.printId(queryId),
-                            DebugUtil.printId(params.getFragmentInstanceId()),
-                            builder.toString());
-                }
+                LOG.debug("profile for query_id={} instance_id={}\n{}",
+                        DebugUtil.printId(queryId),
+                        DebugUtil.printId(params.getFragmentInstanceId()),
+                        builder.toString());
             }
 
             Status status = new Status(params.status);
