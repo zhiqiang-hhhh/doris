@@ -1065,12 +1065,12 @@ public class Coordinator implements CoordInterface {
                         case TIMEOUT:
                             MetricRepo.BE_COUNTER_QUERY_RPC_FAILED.getOrAdd(triple.getLeft().brpcAddr.hostname)
                                     .increase(1L);
-                            throw new RpcException(triple.getLeft().brpcAddr.hostname, errMsg, exception);
+                            throw new RpcException(triple.getLeft().brpcAddr.toString(), errMsg, exception);
                         case THRIFT_RPC_ERROR:
                             MetricRepo.BE_COUNTER_QUERY_RPC_FAILED.getOrAdd(triple.getLeft().brpcAddr.hostname)
                                     .increase(1L);
                             SimpleScheduler.addToBlacklist(triple.getLeft().beId, errMsg);
-                            throw new RpcException(triple.getLeft().brpcAddr.hostname, errMsg, exception);
+                            throw new RpcException(triple.getLeft().brpcAddr.toString(), errMsg, exception);
                         default:
                             throw new UserException(errMsg, exception);
                     }
@@ -2450,10 +2450,9 @@ public class Coordinator implements CoordInterface {
             if (LOG.isDebugEnabled()) {
                 StringBuilder builder = new StringBuilder();
                 ctx.printProfile(builder);
-                LOG.debug("profile for query_id={} instance_id={}\n{}",
+                LOG.debug("profile for query_id={} instance_id={}",
                         DebugUtil.printId(queryId),
-                        DebugUtil.printId(params.getFragmentInstanceId()),
-                        builder.toString());
+                        DebugUtil.printId(params.getFragmentInstanceId()));
             }
 
             Status status = new Status(params.status);

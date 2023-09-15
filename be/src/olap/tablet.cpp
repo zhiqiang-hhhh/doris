@@ -2429,19 +2429,16 @@ RowsetSharedPtr Tablet::pick_cooldown_rowset() {
 bool Tablet::need_cooldown(int64_t* cooldown_timestamp, size_t* file_size) {
     int64_t id = storage_policy_id();
     if (id <= 0) {
-        VLOG_DEBUG << "tablet does not need cooldown, tablet id: " << tablet_id();
         return false;
     }
     auto storage_policy = get_storage_policy(id);
     if (!storage_policy) {
-        LOG(WARNING) << "Cannot get storage policy: " << id;
         return false;
     }
     auto cooldown_ttl_sec = storage_policy->cooldown_ttl;
     auto cooldown_datetime = storage_policy->cooldown_datetime;
     RowsetSharedPtr rowset = pick_cooldown_rowset();
     if (!rowset) {
-        VLOG_DEBUG << "pick cooldown rowset, get null, tablet id: " << tablet_id();
         return false;
     }
 
