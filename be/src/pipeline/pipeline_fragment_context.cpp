@@ -427,7 +427,7 @@ void PipelineFragmentContext::trigger_report_if_necessary() {
                 // _runtime_state->load_channel_profile()->compute_time_in_profile(); // TODO load channel profile add timer
                 _runtime_state->load_channel_profile()->pretty_print(&ss);
             }
-            VLOG_FILE << ss.str();
+            VLOG_FILE << "query " << print_id(get_query_id()) << ss.str();
         }
         auto st = send_report(false);
         if (!st.ok()) {
@@ -870,6 +870,8 @@ void PipelineFragmentContext::_close_fragment_instance() {
     _runtime_profile->total_time_counter()->update(_fragment_watcher.elapsed_time());
     static_cast<void>(send_report(true));
     // all submitted tasks done
+    // TODO(zhiqiang): if pipeline is closed since prepare failed, it will be cancelled again by fe
+    // i dont know whether this should happend.
     _exec_env->fragment_mgr()->remove_pipeline_context(shared_from_this());
 }
 
