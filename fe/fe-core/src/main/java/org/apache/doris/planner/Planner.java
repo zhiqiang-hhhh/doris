@@ -79,7 +79,7 @@ public abstract class Planner {
                 // a blank line between plan fragments
                 str.append("\n");
             }
-            str.append("PLAN FRAGMENT " + i + "\n");
+            str.append("PLAN FRAGMENT " + fragment.getFragmentId().toString() + "\n");
             str.append(fragment.getExplainString(explainLevel));
         }
         if (explainLevel == org.apache.doris.thrift.TExplainLevel.VERBOSE) {
