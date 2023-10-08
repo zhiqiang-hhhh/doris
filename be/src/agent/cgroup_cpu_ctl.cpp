@@ -23,8 +23,7 @@ Status CgroupCpuCtl::init() {
     _doris_cgroup_cpu_path = config::doris_cgroup_cpu_path;
     if (_doris_cgroup_cpu_path.empty()) {
         LOG(INFO) << "doris cgroup cpu path is not specify, path=" << _doris_cgroup_cpu_path;
-        return Status::InternalError("doris cgroup cpu path {} is not specify.",
-                                     _doris_cgroup_cpu_path);
+        return Status::InternalError("doris cgroup cpu path is not specify.");
     }
 
     if (access(_doris_cgroup_cpu_path.c_str(), F_OK) != 0) {

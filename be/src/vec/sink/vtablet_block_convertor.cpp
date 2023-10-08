@@ -207,20 +207,20 @@ Status OlapTableBlockConvertor::_validate_column(RuntimeState* state, const Type
                 if (invalid) {
                     last_invalid_row = row;
                     if (str_val.size > type.len) {
-                        fmt::format_to(error_msg, "{}",
+                        fmt::format_to(std::back_inserter(error_msg), "{}",
                                        "the length of input is too long than schema. ");
-                        fmt::format_to(error_msg, "first 32 bytes of input str: [{}] ",
+                        fmt::format_to(std::back_inserter(error_msg), "first 32 bytes of input str: [{}] ",
                                        str_val.to_prefix(32));
-                        fmt::format_to(error_msg, "schema length: {}; ", type.len);
-                        fmt::format_to(error_msg, "actual length: {}; ", str_val.size);
+                        fmt::format_to(std::back_inserter(error_msg), "schema length: {}; ", type.len);
+                        fmt::format_to(std::back_inserter(error_msg), "actual length: {}; ", str_val.size);
                     } else if (str_val.size > limit) {
-                        fmt::format_to(error_msg, "{}",
+                        fmt::format_to(std::back_inserter(error_msg), "{}",
                                        "the length of input string is too long than vec schema. ");
-                        fmt::format_to(error_msg, "first 32 bytes of input str: [{}] ",
+                        fmt::format_to(std::back_inserter(error_msg), "first 32 bytes of input str: [{}] ",
                                        str_val.to_prefix(32));
-                        fmt::format_to(error_msg, "schema length: {}; ", type.len);
-                        fmt::format_to(error_msg, "limit length: {}; ", limit);
-                        fmt::format_to(error_msg, "actual length: {}; ", str_val.size);
+                        fmt::format_to(std::back_inserter(error_msg), "schema length: {}; ", type.len);
+                        fmt::format_to(std::back_inserter(error_msg), "limit length: {}; ", limit);
+                        fmt::format_to(std::back_inserter(error_msg), "actual length: {}; ", str_val.size);
                     }
                     RETURN_IF_ERROR(set_invalid_and_append_error_msg(row));
                 }
@@ -240,7 +240,7 @@ Status OlapTableBlockConvertor::_validate_column(RuntimeState* state, const Type
                 bool invalid = str_val.size == 0;
                 if (invalid) {
                     error_msg.clear();
-                    fmt::format_to(error_msg, "{}", "jsonb with size 0 is invalid");
+                    fmt::format_to(std::back_inserter(error_msg), "{}", "jsonb with size 0 is invalid");
                     RETURN_IF_ERROR(set_invalid_and_append_error_msg(j));
                 }
             }
@@ -268,18 +268,18 @@ Status OlapTableBlockConvertor::_validate_column(RuntimeState* state, const Type
                     column_decimal->get_data()[j] = dec_val.value();
 
                     if (code != E_DEC_OK) {
-                        fmt::format_to(error_msg, "round one decimal failed.value={}; ",
+                        fmt::format_to(std::back_inserter(error_msg), "round one decimal failed.value={}; ",
                                        dec_val.to_string());
                         invalid = true;
                     }
                 }
                 if (dec_val > max_decimalv2 || dec_val < min_decimalv2) {
-                    fmt::format_to(error_msg, "{}", "decimal value is not valid for definition");
-                    fmt::format_to(error_msg, ", value={}", dec_val.to_string());
-                    fmt::format_to(error_msg, ", precision={}, scale={}", type.precision,
-                                   type.scale);
-                    fmt::format_to(error_msg, ", min={}, max={}; ", min_decimalv2.to_string(),
-                                   max_decimalv2.to_string());
+                    fmt::format_to(std::back_inserter(error_msg), "{}", "decimal value is not valid for definition");
+                    // fmt::format_to(std::back_inserter(error_msg), ", value={}", dec_val.to_string());
+                    // fmt::format_to(std::back_inserter(error_msg), ", precision={}, scale={}", type.precision,
+                    //                type.scale);
+                    // fmt::format_to(std::back_inserter(error_msg), ", min={}, max={}; ", min_decimalv2.to_string(),
+                    //                max_decimalv2.to_string());
                     invalid = true;
                 }
 
@@ -306,10 +306,7 @@ Status OlapTableBlockConvertor::_validate_column(RuntimeState* state, const Type
             auto dec_val = column_decimal->get_data()[j];                                          \
             bool invalid = false;                                                                  \
             if (dec_val > max_decimal || dec_val < min_decimal) {                                  \
-                fmt::format_to(error_msg, "{}", "decimal value is not valid for definition");      \
-                fmt::format_to(error_msg, ", value={}", dec_val);                                  \
-                fmt::format_to(error_msg, ", precision={}, scale={}", type.precision, type.scale); \
-                fmt::format_to(error_msg, ", min={}, max={}; ", min_decimal, max_decimal);         \
+                fmt::format_to(std::back_inserter(error_msg), "{}", "decimal value is not valid for definition");      \
                 invalid = true;                                                                    \
             }                                                                                      \
             if (invalid) {                                                                         \
@@ -342,7 +339,7 @@ Status OlapTableBlockConvertor::_validate_column(RuntimeState* state, const Type
                 permutation[c] = rows ? (*rows)[r] : r;
             }
         }
-        fmt::format_to(error_prefix, "ARRAY type failed: ");
+        fmt::format_to(std::back_inserter(error_prefix), "ARRAY type failed: ");
         RETURN_IF_ERROR(_validate_column(state, nested_type, type.contains_nulls[0],
                                          column_array->get_data_ptr(), slot_index, stop_processing,
                                          error_prefix, &permutation));
@@ -360,7 +357,7 @@ Status OlapTableBlockConvertor::_validate_column(RuntimeState* state, const Type
                 permutation[c] = rows ? (*rows)[r] : r;
             }
         }
-        fmt::format_to(error_prefix, "MAP type failed: ");
+        fmt::format_to(std::back_inserter(error_prefix), "MAP type failed: ");
         RETURN_IF_ERROR(_validate_column(state, key_type, type.contains_nulls[0],
                                          column_map->get_keys_ptr(), slot_index, stop_processing,
                                          error_prefix, &permutation));
@@ -373,7 +370,7 @@ Status OlapTableBlockConvertor::_validate_column(RuntimeState* state, const Type
         const auto column_struct =
                 assert_cast<const vectorized::ColumnStruct*>(real_column_ptr.get());
         DCHECK(type.children.size() == column_struct->tuple_size());
-        fmt::format_to(error_prefix, "STRUCT type failed: ");
+        fmt::format_to(std::back_inserter(error_prefix), "STRUCT type failed: ");
         for (size_t sc = 0; sc < column_struct->tuple_size(); ++sc) {
             RETURN_IF_ERROR(_validate_column(state, type.children[sc], type.contains_nulls[sc],
                                              column_struct->get_column_ptr(sc), slot_index,
@@ -396,7 +393,7 @@ Status OlapTableBlockConvertor::_validate_column(RuntimeState* state, const Type
                 continue;
             }
             if (null_map[j] && !_filter_bitmap.Get(row)) {
-                fmt::format_to(error_msg, "null value for not null column, type={}",
+                fmt::format_to(std::back_inserter(error_msg), "null value for not null column, type={}",
                                type.debug_string());
                 last_invalid_row = row;
                 RETURN_IF_ERROR(set_invalid_and_append_error_msg(row));
@@ -416,7 +413,7 @@ Status OlapTableBlockConvertor::_validate_data(RuntimeState* state, vectorized::
         const auto& column = block->get_by_position(i).column;
 
         fmt::memory_buffer error_prefix;
-        fmt::format_to(error_prefix, "column_name[{}], ", desc->col_name());
+        fmt::format_to(std::back_inserter(error_prefix), "column_name[{}], ", desc->col_name());
         RETURN_IF_ERROR(_validate_column(state, desc->type(), desc->is_nullable(), column, i,
                                          stop_processing, error_prefix));
     }

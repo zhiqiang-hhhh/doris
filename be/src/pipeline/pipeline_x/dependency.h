@@ -158,11 +158,11 @@ public:
 
     [[nodiscard]] std::string name() const override {
         fmt::memory_buffer debug_string_buffer;
-        fmt::format_to(debug_string_buffer, "{}[", _name);
+        fmt::format_to(std::back_inserter(debug_string_buffer), "{}[", _name);
         for (auto& child : _children) {
-            fmt::format_to(debug_string_buffer, "{}, ", child->name());
+            fmt::format_to(std::back_inserter(debug_string_buffer), "{}, ", child->name());
         }
-        fmt::format_to(debug_string_buffer, "]");
+        fmt::format_to(std::back_inserter(debug_string_buffer), "]");
         return fmt::to_string(debug_string_buffer);
     }
 
@@ -199,11 +199,11 @@ public:
 
     [[nodiscard]] std::string name() const override {
         fmt::memory_buffer debug_string_buffer;
-        fmt::format_to(debug_string_buffer, "{}[", _name);
+        fmt::format_to(std::back_inserter(debug_string_buffer), "{}[", _name);
         for (auto& child : _children) {
-            fmt::format_to(debug_string_buffer, "{}, ", child->name());
+            fmt::format_to(std::back_inserter(debug_string_buffer), "{}, ", child->name());
         }
-        fmt::format_to(debug_string_buffer, "]");
+        fmt::format_to(std::back_inserter(debug_string_buffer), "]");
         return fmt::to_string(debug_string_buffer);
     }
 

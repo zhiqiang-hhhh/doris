@@ -45,8 +45,8 @@ public:
     // Format message with fmt::format, like the logging functions.
     template <typename... Args>
     Exception(int code, const std::string_view fmt, Args&&... args)
-            : Exception(code, fmt::format(fmt, std::forward<Args>(args)...)) {}
-
+            : Exception(code, "") {}
+//fmt::format(fmt, std::forward<Args>(args)...)
     int code() const { return _code; }
 
     const std::string& to_string() const;

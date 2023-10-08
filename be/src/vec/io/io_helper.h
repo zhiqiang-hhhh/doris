@@ -44,7 +44,7 @@ static constexpr auto WRITE_HELPERS_MAX_INT_WIDTH = 40U;
 
 inline std::string int128_to_string(__int128_t value) {
     fmt::memory_buffer buffer;
-    fmt::format_to(buffer, "{}", value);
+    fmt::format_to(std::back_inserter(buffer), "{}", value);
     return std::string(buffer.data(), buffer.size());
 }
 

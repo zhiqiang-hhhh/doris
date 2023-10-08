@@ -1120,7 +1120,7 @@ private:
                 }
             }
 
-            fmt::format_to(buffer, "{}", fmt::join(views, sep));
+            fmt::format_to(std::back_inserter(buffer), "{}", fmt::join(views, sep));
 
             StringOP::push_value_string(std::string_view(buffer.data(), buffer.size()), i, res_data,
                                         res_offset);
@@ -1160,7 +1160,7 @@ private:
                     views.emplace_back(ptr, size);
                 }
             }
-            fmt::format_to(buffer, "{}", fmt::join(views, sep));
+            fmt::format_to(std::back_inserter(buffer), "{}", fmt::join(views, sep));
             StringOP::push_value_string(std::string_view(buffer.data(), buffer.size()), i, res_data,
                                         res_offset);
         }

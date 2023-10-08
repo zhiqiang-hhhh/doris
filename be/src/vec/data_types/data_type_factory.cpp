@@ -531,7 +531,7 @@ DataTypePtr DataTypeFactory::create_data_type(const PColumnMeta& pcolumn) {
         break;
     }
     default: {
-        LOG(FATAL) << fmt::format("Unknown data type: {}", pcolumn.type());
+        LOG(FATAL) << fmt::format("Unknown data type: {}", fmt::underlying(pcolumn.type()));
         return nullptr;
     }
     }

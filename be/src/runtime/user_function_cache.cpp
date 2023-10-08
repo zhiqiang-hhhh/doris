@@ -59,7 +59,7 @@ struct UserFunctionCacheEntry {
 
     std::string debug_string() {
         fmt::memory_buffer error_msg;
-        fmt::format_to(error_msg,
+        fmt::format_to(std::back_inserter(error_msg),
                        " the info of UserFunctionCacheEntry save in BE, function_id:{}, "
                        "checksum:{}, lib_file:{}, is_downloaded:{}. ",
                        function_id, checksum, lib_file, is_downloaded);
@@ -307,7 +307,7 @@ Status UserFunctionCache::_download_lib(const std::string& url,
     if (!iequal(digest.hex(), entry->checksum)) {
         fmt::memory_buffer error_msg;
         fmt::format_to(
-                error_msg,
+                std::back_inserter(error_msg),
                 " The checksum is not equal of {} ({}). The init info of first create entry is:"
                 "{} But download file check_sum is: {}, file_size is: {}.",
                 url, real_url, entry->debug_string(), digest.hex(), file_size);

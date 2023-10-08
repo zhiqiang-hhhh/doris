@@ -82,7 +82,7 @@ public:
         if constexpr (sizeof...(args) == 0) {
             _msg.stream() << fmt;
         } else {
-            _msg.stream() << fmt::format(fmt, std::forward<Args&&>(args)...);
+            _msg.stream() << "";// fmt::format(fmt, std::forward<Args&&>(args)...);
         }
         return *this;
     }

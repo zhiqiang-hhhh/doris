@@ -24,6 +24,7 @@
 #include <gen_cpp/Types_types.h>
 #include <thrift/protocol/TDebugProtocol.h>
 
+#include <iterator>
 #include <type_traits>
 
 #include "common/status.h"
@@ -121,7 +122,7 @@ Status MultiTablePipe::dispatch(const std::string& table, const char* data, size
         size_t threshold = config::multi_table_batch_plan_threshold;
         if (_unplanned_row_cnt >= threshold) {
             LOG(INFO) << fmt::format("unplanned row cnt={} reach threshold={}, plan them",
-                                     _unplanned_row_cnt, threshold);
+                                     _unplanned_row_cnt.load(), threshold);
             Status st = request_and_exec_plans();
             _unplanned_row_cnt = 0;
             if (!st.ok()) {
@@ -142,12 +143,12 @@ Status MultiTablePipe::request_and_exec_plans() {
     std::vector<std::string> tables;
     fmt::memory_buffer log_buffer;
     log_buffer.clear();
-    fmt::format_to(log_buffer, "request plans for {} tables: [ ", _unplanned_pipes.size());
+    fmt::format_to(std::back_inserter(log_buffer), "request plans for {} tables: [ ", _unplanned_pipes.size());
     for (auto& pair : _unplanned_pipes) {
         tables.push_back(pair.first);
-        fmt::format_to(log_buffer, "{} ", pair.first);
+        fmt::format_to(std::back_inserter(log_buffer), "{} ", pair.first);
     }
-    fmt::format_to(log_buffer, "]");
+    fmt::format_to(std::back_inserter(log_buffer), "]");
     LOG(INFO) << fmt::to_string(log_buffer);
 
     TStreamLoadPutRequest request;

@@ -47,6 +47,7 @@ using SegmentIteratorUPtr = std::unique_ptr<SegmentIterator>;
 class SchemaCache : public LRUCachePolicy {
 public:
     enum class Type { TABLET_SCHEMA = 0, SCHEMA = 1 };
+    auto format_as(Type f) { return fmt::underlying(f); }
 
     static SchemaCache* instance();
 

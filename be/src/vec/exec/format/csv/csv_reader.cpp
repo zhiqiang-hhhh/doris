@@ -705,7 +705,7 @@ Status CsvReader::_validate_line(const Slice& line, bool* success) {
                     []() -> std::string { return "Unable to display"; },
                     []() -> std::string {
                         fmt::memory_buffer error_msg;
-                        fmt::format_to(error_msg, "{}", "Unable to display");
+                        fmt::format_to(std::back_inserter(error_msg), "{}", "Unable to display");
                         return fmt::to_string(error_msg);
                     },
                     &_line_reader_eof));
@@ -732,12 +732,12 @@ Status CsvReader::_line_split_to_values(const Slice& line, bool* success) {
                     [&]() -> std::string { return std::string(line.data, line.size); },
                     [&]() -> std::string {
                         fmt::memory_buffer error_msg;
-                        fmt::format_to(error_msg, "{} {} {}",
+                        fmt::format_to(std::back_inserter(error_msg), "{} {} {}",
                                        "actual column number in csv file is ", cmp_str,
                                        " schema column number.");
-                        fmt::format_to(error_msg, "actual number: {}, column separator: [{}], ",
+                        fmt::format_to(std::back_inserter(error_msg), "actual number: {}, column separator: [{}], ",
                                        _split_values.size(), _value_separator);
-                        fmt::format_to(error_msg,
+                        fmt::format_to(std::back_inserter(error_msg),
                                        "line delimiter: [{}], schema column number: {}; ",
                                        _line_delimiter, _file_slot_descs.size());
                         return fmt::to_string(error_msg);
@@ -771,7 +771,7 @@ Status CsvReader::_check_array_format(std::vector<Slice>& split_values, bool* is
                     [&]() -> std::string { return std::string(value.data, value.size); },
                     [&]() -> std::string {
                         fmt::memory_buffer err_msg;
-                        fmt::format_to(err_msg, "Invalid format for array column({})",
+                        fmt::format_to(std::back_inserter(err_msg), "Invalid format for array column({})",
                                        slot_desc->col_name());
                         return fmt::to_string(err_msg);
                     },

@@ -445,24 +445,24 @@ void VPartitionSortNode::_init_hash_method() {
 
 void VPartitionSortNode::debug_profile() {
     fmt::memory_buffer partition_rows_read, partition_blocks_read;
-    fmt::format_to(partition_rows_read, "[");
-    fmt::format_to(partition_blocks_read, "[");
+    fmt::format_to(std::back_inserter(partition_rows_read), "[");
+    fmt::format_to(std::back_inserter(partition_blocks_read), "[");
     for (auto place : _value_places) {
-        fmt::format_to(partition_rows_read, "{}, ", place->get_total_rows());
-        fmt::format_to(partition_blocks_read, "{}, ", place->blocks.size());
+        fmt::format_to(std::back_inserter(partition_rows_read), "{}, ", place->get_total_rows());
+        fmt::format_to(std::back_inserter(partition_blocks_read), "{}, ", place->blocks.size());
     }
-    fmt::format_to(partition_rows_read, "]");
-    fmt::format_to(partition_blocks_read, "]");
+    fmt::format_to(std::back_inserter(partition_rows_read), "]");
+    fmt::format_to(std::back_inserter(partition_blocks_read), "]");
 
     runtime_profile()->add_info_string("PerPartitionBlocksRead",
                                        fmt::to_string(partition_blocks_read));
     runtime_profile()->add_info_string("PerPartitionRowsRead", fmt::to_string(partition_rows_read));
     fmt::memory_buffer partition_output_rows;
-    fmt::format_to(partition_output_rows, "[");
+    fmt::format_to(std::back_inserter(partition_output_rows), "[");
     for (auto row : partition_profile_output_rows) {
-        fmt::format_to(partition_output_rows, "{}, ", row);
+        fmt::format_to(std::back_inserter(partition_output_rows), "{}, ", row);
     }
-    fmt::format_to(partition_output_rows, "]");
+    fmt::format_to(std::back_inserter(partition_output_rows), "]");
     runtime_profile()->add_info_string("PerPartitionOutputRows",
                                        fmt::to_string(partition_output_rows));
 }

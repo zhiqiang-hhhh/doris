@@ -19,6 +19,7 @@
 
 #include <butil/logging.h>
 #include <fmt/core.h>
+#include <fmt/format.h>
 #include <gen_cpp/Descriptors_types.h>
 #include <glog/logging.h>
 
@@ -52,7 +53,7 @@ std::string SchemaCache::get_schema_key(int32_t tablet_id, const TabletSchemaSPt
         key.append(fmt::format("{}", col_unique_id));
         key.append("-");
     });
-    key.append(fmt::format("{}-{}", version, type));
+    key.append(fmt::format("{}-{}", version, fmt::underlying(type)));
     return key;
 }
 
@@ -67,7 +68,7 @@ std::string SchemaCache::get_schema_key(int32_t tablet_id, const std::vector<TCo
         key.append(fmt::format("{}", col.col_unique_id));
         key.append("-");
     });
-    key.append(fmt::format("{}-{}", version, type));
+    key.append(fmt::format("{}-{}", version, fmt::underlying(type)));
     return key;
 }
 

@@ -55,9 +55,9 @@ public:
     std::string debug_string() const {
         fmt::memory_buffer buf;
         DCHECK_EQ(begin_scan_range.size(), end_scan_range.size());
-        for (int i = 0; i < begin_scan_range.size(); i++) {
-            fmt::format_to(buf, "({}, {})\n", begin_scan_range[i], end_scan_range[i]);
-        }
+        // for (int i = 0; i < begin_scan_range.size(); i++) {
+        //     fmt::format_to(buf, "({}, {})\n", begin_scan_range[i], end_scan_range[i]);
+        // }
         return fmt::to_string(buf);
     }
 };

@@ -35,7 +35,7 @@ template Status HashJoinDependency::extract_join_column<false>(
 
 std::string Dependency::debug_string(int indentation_level) {
     fmt::memory_buffer debug_string_buffer;
-    fmt::format_to(debug_string_buffer, "{}{}: id={}, done={}",
+    fmt::format_to(std::back_inserter(debug_string_buffer), "{}{}: id={}, done={}",
                    std::string(indentation_level * 2, ' '), _name, _id,
                    read_blocked_by() == nullptr);
     return fmt::to_string(debug_string_buffer);
@@ -43,25 +43,25 @@ std::string Dependency::debug_string(int indentation_level) {
 
 std::string AndDependency::debug_string(int indentation_level) {
     fmt::memory_buffer debug_string_buffer;
-    fmt::format_to(debug_string_buffer, "{}{}: id={}, done={}, children=[",
+    fmt::format_to(std::back_inserter(debug_string_buffer), "{}{}: id={}, done={}, children=[",
                    std::string(indentation_level * 2, ' '), _name, _id,
                    read_blocked_by() == nullptr);
     for (auto& child : _children) {
-        fmt::format_to(debug_string_buffer, "{}, \n", child->debug_string(indentation_level = 1));
+        fmt::format_to(std::back_inserter(debug_string_buffer), "{}, \n", child->debug_string(indentation_level = 1));
     }
-    fmt::format_to(debug_string_buffer, "{}]", std::string(indentation_level * 2, ' '));
+    fmt::format_to(std::back_inserter(debug_string_buffer), "{}]", std::string(indentation_level * 2, ' '));
     return fmt::to_string(debug_string_buffer);
 }
 
 std::string OrDependency::debug_string(int indentation_level) {
     fmt::memory_buffer debug_string_buffer;
-    fmt::format_to(debug_string_buffer, "{}{}: id={}, done={}, children=[",
+    fmt::format_to(std::back_inserter(debug_string_buffer), "{}{}: id={}, done={}, children=[",
                    std::string(indentation_level * 2, ' '), _name, _id,
                    read_blocked_by() == nullptr);
     for (auto& child : _children) {
-        fmt::format_to(debug_string_buffer, "{}, \n", child->debug_string(indentation_level = 1));
+        fmt::format_to(std::back_inserter(debug_string_buffer), "{}, \n", child->debug_string(indentation_level = 1));
     }
-    fmt::format_to(debug_string_buffer, "{}]", std::string(indentation_level * 2, ' '));
+    fmt::format_to(std::back_inserter(debug_string_buffer), "{}]", std::string(indentation_level * 2, ' '));
     return fmt::to_string(debug_string_buffer);
 }
 

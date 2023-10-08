@@ -372,7 +372,7 @@ public:
         if constexpr (sizeof...(args) == 0) {
             status._err_msg->_msg = msg;
         } else {
-            status._err_msg->_msg = fmt::format(msg, std::forward<Args>(args)...);
+            status._err_msg->_msg = ""; // fmt::format(msg, std::forward<Args>(args)...);
         }
 #ifdef ENABLE_STACKTRACE
         if constexpr (stacktrace && capture_stacktrace(code)) {
@@ -391,7 +391,7 @@ public:
         if constexpr (sizeof...(args) == 0) {
             status._err_msg->_msg = msg;
         } else {
-            status._err_msg->_msg = fmt::format(msg, std::forward<Args>(args)...);
+            status._err_msg->_msg = fmt::format(fmt::runtime(msg), std::forward<Args>(args)...);
         }
 #ifdef ENABLE_STACKTRACE
         if (stacktrace && capture_stacktrace(code)) {

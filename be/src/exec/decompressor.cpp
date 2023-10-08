@@ -54,7 +54,8 @@ Status Decompressor::create_decompressor(CompressType type, Decompressor** decom
         break;
 #endif
     default:
-        return Status::InternalError("Unknown compress type: {}", type);
+        // TODO:custom formattor
+        return Status::InternalError("Unknown compress type");
     }
 
     Status st = Status::OK();

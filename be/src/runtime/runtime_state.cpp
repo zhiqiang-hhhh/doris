@@ -397,13 +397,13 @@ Status RuntimeState::append_error_msg_to_file(std::function<std::string()> line,
 
     fmt::memory_buffer out;
     if (is_summary) {
-        fmt::format_to(out, "Summary: {}", error_msg());
+        fmt::format_to(std::back_inserter(out), "Summary: {}", error_msg());
     } else {
         if (_error_row_number < MAX_ERROR_NUM) {
             // Note: export reason first in case src line too long and be truncated.
-            fmt::format_to(out, "Reason: {}. src line [{}]; ", error_msg(), line());
+            fmt::format_to(std::back_inserter(out), "Reason: {}. src line [{}]; ", error_msg(), line());
         } else if (_error_row_number == MAX_ERROR_NUM) {
-            fmt::format_to(out, "TOO MUCH ERROR! already reach {}. show no more next error.",
+            fmt::format_to(std::back_inserter(out), "TOO MUCH ERROR! already reach {}. show no more next error.",
                            MAX_ERROR_NUM);
         }
     }

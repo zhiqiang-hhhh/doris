@@ -23,6 +23,7 @@
 #include <gen_cpp/Types_types.h>
 
 #include <cstdint>
+#include <iterator>
 
 #include "exec/schema_scanner/schema_helper.h"
 #include "runtime/define_primitive_type.h"
@@ -211,7 +212,7 @@ std::string SchemaColumnsScanner::_type_to_string(TColumnDesc& desc) {
     case TPrimitiveType::DECIMAL128I: {
         fmt::memory_buffer debug_string_buffer;
         fmt::format_to(
-                debug_string_buffer, "decimalv3({}, {})",
+                std::back_inserter(debug_string_buffer), "decimalv3({}, {})",
                 desc.__isset.columnPrecision ? std::to_string(desc.columnPrecision) : "UNKNOWN",
                 desc.__isset.columnScale ? std::to_string(desc.columnScale) : "UNKNOWN");
         return fmt::to_string(debug_string_buffer);
@@ -221,9 +222,9 @@ std::string SchemaColumnsScanner::_type_to_string(TColumnDesc& desc) {
     case TPrimitiveType::DATETIMEV2: {
         fmt::memory_buffer debug_string_buffer;
         if (!desc.__isset.columnScale || desc.columnScale == 0) {
-            fmt::format_to(debug_string_buffer, "datetime");
+            fmt::format_to(std::back_inserter(debug_string_buffer), "datetime");
         } else {
-            fmt::format_to(debug_string_buffer, "datetime({})",
+            fmt::format_to(std::back_inserter(debug_string_buffer), "datetime({})",
                            desc.__isset.columnScale ? std::to_string(desc.columnScale) : "UNKNOWN");
         }
         return fmt::to_string(debug_string_buffer);

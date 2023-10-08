@@ -84,9 +84,9 @@ struct BitmapTypeCode {
     };
     Status static inline validate(int bitmap_type) {
         if (UNLIKELY(bitmap_type < type::EMPTY || bitmap_type >= type::TYPE_MAX)) {
-            std::string err_msg =
-                    fmt::format("BitmapTypeCode invalid, should between: {} and {} actrual is {}",
-                                BitmapTypeCode::EMPTY, BitmapTypeCode::BITMAP64, bitmap_type);
+            std::string err_msg = "BitmapTypeCode invalid";
+                    // fmt::format("BitmapTypeCode invalid, should between: {} and {} actrual is {}",
+                    //             BitmapTypeCode::EMPTY, BitmapTypeCode::BITMAP64, bitmap_type);
             LOG(ERROR) << err_msg;
             return Status::Corruption(err_msg);
         }

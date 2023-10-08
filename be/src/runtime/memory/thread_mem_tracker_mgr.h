@@ -23,6 +23,7 @@
 #include <stdint.h>
 
 #include <algorithm>
+#include <iterator>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -98,7 +99,7 @@ public:
     std::string print_debug_string() {
         fmt::memory_buffer consumer_tracker_buf;
         for (const auto& v : _consumer_tracker_stack) {
-            fmt::format_to(consumer_tracker_buf, "{}, ", MemTracker::log_usage(v->make_snapshot()));
+            fmt::format_to(std::back_inserter(consumer_tracker_buf), "{}, ", MemTracker::log_usage(v->make_snapshot()));
         }
         return fmt::format(
                 "ThreadMemTrackerMgr debug, _untracked_mem:{}, "

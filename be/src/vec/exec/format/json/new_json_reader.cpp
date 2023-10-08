@@ -640,8 +640,8 @@ Status NewJsonReader::_parse_json_doc(size_t* size, bool* eof) {
 
     if (has_parse_error) {
         fmt::memory_buffer error_msg;
-        fmt::format_to(error_msg, "Parse json data for JsonDoc failed. code: {}, error info: {}",
-                       _origin_json_doc.GetParseError(),
+        fmt::format_to(std::back_inserter(error_msg), "Parse json data for JsonDoc failed. code: {}, error info: {}",
+                       fmt::underlying(_origin_json_doc.GetParseError()),
                        rapidjson::GetParseError_En(_origin_json_doc.GetParseError()));
         RETURN_IF_ERROR(_state->append_error_msg_to_file(
                 [&]() -> std::string { return std::string((char*)json_str, *size); },
@@ -663,7 +663,7 @@ Status NewJsonReader::_parse_json_doc(size_t* size, bool* eof) {
                 _parsed_json_root, &_origin_json_doc, _origin_json_doc.GetAllocator());
         if (_json_doc == nullptr) {
             fmt::memory_buffer error_msg;
-            fmt::format_to(error_msg, "{}", "JSON Root not found.");
+            fmt::format_to(std::back_inserter(error_msg), "{}", "JSON Root not found.");
             RETURN_IF_ERROR(_state->append_error_msg_to_file(
                     [&]() -> std::string { return _print_json_value(_origin_json_doc); },
                     [&]() -> std::string { return fmt::to_string(error_msg); }, _scanner_eof));
@@ -681,7 +681,7 @@ Status NewJsonReader::_parse_json_doc(size_t* size, bool* eof) {
 
     if (_json_doc->IsArray() && !_strip_outer_array) {
         fmt::memory_buffer error_msg;
-        fmt::format_to(error_msg, "{}",
+        fmt::format_to(std::back_inserter(error_msg), "{}",
                        "JSON data is array-object, `strip_outer_array` must be TRUE.");
         RETURN_IF_ERROR(_state->append_error_msg_to_file(
                 [&]() -> std::string { return _print_json_value(_origin_json_doc); },
@@ -697,7 +697,7 @@ Status NewJsonReader::_parse_json_doc(size_t* size, bool* eof) {
 
     if (!_json_doc->IsArray() && _strip_outer_array) {
         fmt::memory_buffer error_msg;
-        fmt::format_to(error_msg, "{}",
+        fmt::format_to(std::back_inserter(error_msg), "{}",
                        "JSON data is not an array-object, `strip_outer_array` must be FALSE.");
         RETURN_IF_ERROR(_state->append_error_msg_to_file(
                 [&]() -> std::string { return _print_json_value(_origin_json_doc); },
@@ -917,7 +917,7 @@ Status NewJsonReader::_append_error_msg(const rapidjson::Value& objectValue, std
     std::string err_msg;
     if (!col_name.empty()) {
         fmt::memory_buffer error_buf;
-        fmt::format_to(error_buf, error_msg, col_name);
+        fmt::format_to(std::back_inserter(error_buf), "{} {}", error_msg, col_name);
         err_msg = fmt::to_string(error_buf);
     } else {
         err_msg = error_msg;
@@ -1075,8 +1075,8 @@ Status NewJsonReader::_simdjson_handle_simple_json(RuntimeState* /*state*/, Bloc
             // prevent from endless loop
             _next_row = _total_rows + 1;
             fmt::memory_buffer error_msg;
-            fmt::format_to(error_msg, "Parse json data failed. code: {}, error info: {}", e.error(),
-                           e.what());
+            fmt::format_to(std::back_inserter(error_msg), "Parse json data failed. code: {}, error info: {}", 
+                            fmt::underlying(e.error()), e.what());
             RETURN_IF_ERROR(_state->append_error_msg_to_file(
                     [&]() -> std::string {
                         return std::string(_simdjson_ondemand_padding_buffer.data(),
@@ -1174,8 +1174,9 @@ Status NewJsonReader::_simdjson_handle_flat_array_complex_json(
             // prevent from endless loop
             _next_row = _total_rows + 1;
             fmt::memory_buffer error_msg;
-            fmt::format_to(error_msg, "Parse json data failed. code: {}, error info: {}", e.error(),
-                           e.what());
+            fmt::format_to(std::back_inserter(error_msg), 
+                           "Parse json data failed. code: {}, error info: {}", 
+                           fmt::underlying(e.error()), e.what());
             RETURN_IF_ERROR(_state->append_error_msg_to_file(
                     [&]() -> std::string {
                         return std::string(_simdjson_ondemand_padding_buffer.data(),
@@ -1245,8 +1246,8 @@ Status NewJsonReader::_simdjson_handle_nested_complex_json(
             break; // read a valid row
         } catch (simdjson::simdjson_error& e) {
             fmt::memory_buffer error_msg;
-            fmt::format_to(error_msg, "Parse json data failed. code: {}, error info: {}", e.error(),
-                           e.what());
+            fmt::format_to(std::back_inserter(error_msg), "Parse json data failed. code: {}, error info: {}",
+                            fmt::underlying(e.error()), e.what());
             RETURN_IF_ERROR(_state->append_error_msg_to_file(
                     [&]() -> std::string {
                         return std::string(_simdjson_ondemand_padding_buffer.data(),
@@ -1418,7 +1419,7 @@ Status NewJsonReader::_append_error_msg(simdjson::ondemand::object* obj, std::st
     std::string err_msg;
     if (!col_name.empty()) {
         fmt::memory_buffer error_buf;
-        fmt::format_to(error_buf, error_msg, col_name);
+        fmt::format_to(std::back_inserter(error_buf), "{} {}", error_msg, col_name);
         err_msg = fmt::to_string(error_buf);
     } else {
         err_msg = error_msg;
@@ -1523,22 +1524,22 @@ Status NewJsonReader::_simdjson_parse_json_doc(size_t* size, bool* eof) {
     };
     if (error != simdjson::error_code::SUCCESS) {
         fmt::memory_buffer error_msg;
-        fmt::format_to(error_msg, "Parse json data for JsonDoc failed. code: {}, error info: {}",
-                       error, simdjson::error_message(error));
+        fmt::format_to(std::back_inserter(error_msg), "Parse json data for JsonDoc failed. code: {}, error info: {}",
+                       fmt::underlying(error), simdjson::error_message(error));
         return return_quality_error(error_msg, std::string((char*)json_str, *size));
     }
     auto type_res = _original_json_doc.type();
     if (type_res.error() != simdjson::error_code::SUCCESS) {
         fmt::memory_buffer error_msg;
-        fmt::format_to(error_msg, "Parse json data for JsonDoc failed. code: {}, error info: {}",
-                       type_res.error(), simdjson::error_message(type_res.error()));
+        fmt::format_to(std::back_inserter(error_msg), "Parse json data for JsonDoc failed. code: {}, error info: {}",
+                       fmt::underlying(type_res.error()), simdjson::error_message(type_res.error()));
         return return_quality_error(error_msg, std::string((char*)json_str, *size));
     }
     simdjson::ondemand::json_type type = type_res.value();
     if (type != simdjson::ondemand::json_type::object &&
         type != simdjson::ondemand::json_type::array) {
         fmt::memory_buffer error_msg;
-        fmt::format_to(error_msg, "Not an json object or json array");
+        fmt::format_to(std::back_inserter(error_msg), "Not an json object or json array");
         return return_quality_error(error_msg, std::string((char*)json_str, *size));
     }
     if (_parsed_json_root.size() != 0 && type == simdjson::ondemand::json_type::object) {
@@ -1550,12 +1551,12 @@ Status NewJsonReader::_simdjson_parse_json_doc(size_t* size, bool* eof) {
             Status st = JsonFunctions::extract_from_object(object, _parsed_json_root, &_json_value);
             if (!st.ok()) {
                 fmt::memory_buffer error_msg;
-                fmt::format_to(error_msg, "{}", st.to_string());
+                fmt::format_to(std::back_inserter(error_msg), "{}", st.to_string());
                 return return_quality_error(error_msg, std::string((char*)json_str, *size));
             }
         } catch (simdjson::simdjson_error& e) {
             fmt::memory_buffer error_msg;
-            fmt::format_to(error_msg, "Encounter error while extract_from_object, error: {}",
+            fmt::format_to(std::back_inserter(error_msg), "Encounter error while extract_from_object, error: {}",
                            e.what());
             return return_quality_error(error_msg, std::string((char*)json_str, *size));
         }
@@ -1565,14 +1566,14 @@ Status NewJsonReader::_simdjson_parse_json_doc(size_t* size, bool* eof) {
 
     if (_json_value.type() == simdjson::ondemand::json_type::array && !_strip_outer_array) {
         fmt::memory_buffer error_msg;
-        fmt::format_to(error_msg, "{}",
+        fmt::format_to(std::back_inserter(error_msg), "{}",
                        "JSON data is array-object, `strip_outer_array` must be TRUE.");
         return return_quality_error(error_msg, std::string((char*)json_str, *size));
     }
 
     if (_json_value.type() != simdjson::ondemand::json_type::array && _strip_outer_array) {
         fmt::memory_buffer error_msg;
-        fmt::format_to(error_msg, "{}",
+        fmt::format_to(std::back_inserter(error_msg), "{}",
                        "JSON data is not an array-object, `strip_outer_array` must be FALSE.");
         return return_quality_error(error_msg, std::string((char*)json_str, *size));
     }

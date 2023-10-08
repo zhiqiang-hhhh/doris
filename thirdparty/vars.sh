@@ -283,10 +283,10 @@ CROARINGBITMAP_SOURCE=CRoaring-0.4.0
 CROARINGBITMAP_MD5SUM="7c5cb6f2089cedc5ad9373f538a83334"
 
 # fmt
-FMT_DOWNLOAD="https://github.com/fmtlib/fmt/archive/7.1.3.tar.gz"
-FMT_NAME="fmt-7.1.3.tar.gz"
-FMT_SOURCE="fmt-7.1.3"
-FMT_MD5SUM="2522ec65070c0bda0ca288677ded2831"
+FMT_DOWNLOAD="https://github.com/fmtlib/fmt/archive/refs/tags/10.1.1.tar.gz"
+FMT_NAME="fmt-10.1.1.tar.gz"
+FMT_SOURCE="fmt-10.1.1"
+FMT_MD5SUM="0d41a16f1b3878d44e6fd7ff1f6cc45a"
 
 # parallel-hashmap
 PARALLEL_HASHMAP_DOWNLOAD="https://github.com/greg7mdp/parallel-hashmap/archive/refs/tags/v1.3.8.tar.gz"

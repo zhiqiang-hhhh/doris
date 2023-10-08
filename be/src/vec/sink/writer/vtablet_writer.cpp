@@ -1029,7 +1029,7 @@ Status VTabletWriter::open(doris::RuntimeState* state, doris::RuntimeProfile* pr
 
     fmt::memory_buffer buf;
     for (const auto& index_channel : _channels) {
-        fmt::format_to(buf, "index id:{}", index_channel->_index_id);
+        fmt::format_to(std::back_inserter(buf), "index id:{}", index_channel->_index_id);
         index_channel->for_each_node_channel(
                 [](const std::shared_ptr<VNodeChannel>& ch) { ch->open(); });
     }
@@ -1283,7 +1283,7 @@ Status VTabletWriter::_incremental_open_node_channel(
         // incremental open new partition's tablet on storage side
         channel->for_each_node_channel(
                 [](const std::shared_ptr<VNodeChannel>& ch) { ch->incremental_open(); });
-        fmt::format_to(buf, "index id:{}", channel->_index_id);
+        fmt::format_to(std::back_inserter(buf), "index id:{}", channel->_index_id);
         VLOG_DEBUG << "list of open index id = " << fmt::to_string(buf);
 
         channel->for_each_node_channel([&channel](const std::shared_ptr<VNodeChannel>& ch) {
@@ -1428,7 +1428,7 @@ void VTabletWriter::_cancel_all_channel(Status status) {
     LOG(INFO) << fmt::format(
             "close olap table sink. load_id={}, txn_id={}, canceled all node channels due to "
             "error: {}",
-            print_id(_load_id), _txn_id, status);
+            print_id(_load_id), _txn_id, status.to_string());
 }
 
 Status VTabletWriter::try_close(RuntimeState* state, Status exec_status) {

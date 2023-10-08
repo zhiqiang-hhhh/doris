@@ -260,7 +260,7 @@ JdbcTableDescriptor::JdbcTableDescriptor(const TTableDescriptor& tdesc)
 
 std::string JdbcTableDescriptor::debug_string() const {
     fmt::memory_buffer buf;
-    fmt::format_to(buf,
+    fmt::format_to(std::back_inserter(buf),
                    "JDBCTable({} ,_jdbc_resource_name={} ,_jdbc_driver_url={} "
                    ",_jdbc_driver_class={} ,_jdbc_driver_checksum={} ,_jdbc_url={} "
                    ",_jdbc_table_name={} ,_jdbc_user={} ,_jdbc_passwd={})",

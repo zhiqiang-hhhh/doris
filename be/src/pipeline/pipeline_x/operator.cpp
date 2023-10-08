@@ -66,10 +66,10 @@ std::string PipelineXLocalStateBase::debug_string(int indentation_level) const {
 template <typename DependencyType>
 std::string PipelineXLocalState<DependencyType>::debug_string(int indentation_level) const {
     fmt::memory_buffer debug_string_buffer;
-    fmt::format_to(debug_string_buffer, "{}",
+    fmt::format_to(std::back_inserter(debug_string_buffer), "{}",
                    PipelineXLocalStateBase::debug_string(indentation_level));
     if (_dependency) {
-        fmt::format_to(debug_string_buffer, "\nDependency: \n {}",
+        fmt::format_to(std::back_inserter(debug_string_buffer), "\nDependency: \n {}",
                        _dependency->debug_string(indentation_level + 1));
     }
     return fmt::to_string(debug_string_buffer);
@@ -78,10 +78,10 @@ std::string PipelineXLocalState<DependencyType>::debug_string(int indentation_le
 template <typename DependencyType>
 std::string PipelineXSinkLocalState<DependencyType>::debug_string(int indentation_level) const {
     fmt::memory_buffer debug_string_buffer;
-    fmt::format_to(debug_string_buffer, "{}",
+    fmt::format_to(std::back_inserter(debug_string_buffer), "{}",
                    PipelineXSinkLocalStateBase::debug_string(indentation_level));
     if (_dependency) {
-        fmt::format_to(debug_string_buffer, "\n{}Dependency: \n {}",
+        fmt::format_to(std::back_inserter(debug_string_buffer), "\n{}Dependency: \n {}",
                        std::string(indentation_level * 2, ' '),
                        _dependency->debug_string(indentation_level + 1));
     }
@@ -90,7 +90,7 @@ std::string PipelineXSinkLocalState<DependencyType>::debug_string(int indentatio
 
 std::string OperatorXBase::debug_string(int indentation_level) const {
     fmt::memory_buffer debug_string_buffer;
-    fmt::format_to(debug_string_buffer, "{}{}: id={}", std::string(indentation_level * 2, ' '),
+    fmt::format_to(std::back_inserter(debug_string_buffer), "{}{}: id={}", std::string(indentation_level * 2, ' '),
                    _op_name, _id);
     return fmt::to_string(debug_string_buffer);
 }
@@ -224,7 +224,7 @@ void PipelineXLocalStateBase::reached_limit(vectorized::Block* block, SourceStat
 std::string DataSinkOperatorXBase::debug_string(int indentation_level) const {
     fmt::memory_buffer debug_string_buffer;
 
-    fmt::format_to(debug_string_buffer, "{}{}: id={}", std::string(indentation_level * 2, ' '),
+    fmt::format_to(std::back_inserter(debug_string_buffer), "{}{}: id={}", std::string(indentation_level * 2, ' '),
                    _name, _id);
     return fmt::to_string(debug_string_buffer);
 }

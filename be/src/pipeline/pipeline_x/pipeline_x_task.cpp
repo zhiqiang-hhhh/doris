@@ -290,27 +290,27 @@ Status PipelineXTask::close(Status exec_status) {
 std::string PipelineXTask::debug_string() {
     fmt::memory_buffer debug_string_buffer;
 
-    fmt::format_to(debug_string_buffer, "QueryId: {}\n", print_id(query_context()->query_id()));
-    fmt::format_to(debug_string_buffer, "InstanceId: {}\n",
+    fmt::format_to(std::back_inserter(debug_string_buffer), "QueryId: {}\n", print_id(query_context()->query_id()));
+    fmt::format_to(std::back_inserter(debug_string_buffer), "InstanceId: {}\n",
                    print_id(_state->fragment_instance_id()));
 
-    fmt::format_to(debug_string_buffer, "RuntimeUsage: {}\n",
+    fmt::format_to(std::back_inserter(debug_string_buffer), "RuntimeUsage: {}\n",
                    PrettyPrinter::print(get_runtime_ns(), TUnit::TIME_NS));
     {
         std::stringstream profile_ss;
         _fresh_profile_counter();
         _task_profile->pretty_print(&profile_ss, "");
-        fmt::format_to(debug_string_buffer, "Profile: {}\n", profile_ss.str());
+        fmt::format_to(std::back_inserter(debug_string_buffer), "Profile: {}\n", profile_ss.str());
     }
-    fmt::format_to(debug_string_buffer,
+    fmt::format_to(std::back_inserter(debug_string_buffer),
                    "PipelineTask[this = {}, state = {}]\noperators: ", (void*)this,
                    get_state_name(_cur_state));
     for (size_t i = 0; i < _operators.size(); i++) {
         fmt::format_to(
-                debug_string_buffer, "\n{}",
+                std::back_inserter(debug_string_buffer), "\n{}",
                 _opened ? _operators[i]->debug_string(_state, i) : _operators[i]->debug_string(i));
     }
-    fmt::format_to(debug_string_buffer, "\n{}",
+    fmt::format_to(std::back_inserter(debug_string_buffer), "\n{}",
                    _opened ? _sink->debug_string(_state, _operators.size())
                            : _sink->debug_string(_operators.size()));
     return fmt::to_string(debug_string_buffer);

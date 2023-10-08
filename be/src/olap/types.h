@@ -1078,7 +1078,7 @@ struct FieldTypeTraits<FieldType::OLAP_FIELD_TYPE_DECIMAL128I>
     static std::string to_string(const void* src) {
         int128_t value = reinterpret_cast<const PackedInt128*>(src)->value;
         fmt::memory_buffer buffer;
-        fmt::format_to(buffer, "{}", value);
+        fmt::format_to(std::back_inserter(buffer), "{}", value);
         return std::string(buffer.data(), buffer.size());
     }
 };

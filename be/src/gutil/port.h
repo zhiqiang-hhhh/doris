@@ -306,7 +306,7 @@ inline void* memrchr(const void* bytes, int find_char, size_t len) {
 //
 // Prevent the compiler from padding a structure to natural alignment
 //
-#define PACKED __attribute__((packed))
+#define DORIS_PACKED __attribute__((packed))
 
 // Cache line alignment
 #if defined(__i386__) || defined(__x86_64__)

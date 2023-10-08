@@ -357,7 +357,7 @@ std::optional<size_t> DataTypeStruct::try_get_position_by_name(const String& nam
 String DataTypeStruct::get_name_by_position(size_t i) const {
     if (i == 0 || i > names.size()) {
         fmt::memory_buffer error_msg;
-        fmt::format_to(error_msg, "Index of tuple element ({}) if out range ([1, {}])", i,
+        fmt::format_to(std::back_inserter(error_msg), "Index of tuple element ({}) if out range ([1, {}])", i,
                        names.size());
         LOG(FATAL) << fmt::to_string(error_msg);
     }

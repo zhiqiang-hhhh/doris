@@ -26,6 +26,7 @@
 #include <string.h>
 
 #include <algorithm>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -205,7 +206,7 @@ private:
 
     std::string encode_key(__int128_t cache_id) {
         fmt::memory_buffer buffer;
-        fmt::format_to(buffer, "{}", cache_id);
+        fmt::format_to(std::back_inserter(buffer), "{}", cache_id);
         return std::string(buffer.data(), buffer.size());
     }
 

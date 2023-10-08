@@ -440,7 +440,7 @@ Status AggregationNode::prepare_profile(RuntimeState* state) {
     }
 
     fmt::memory_buffer msg;
-    fmt::format_to(msg,
+    fmt::format_to(std::back_inserter(msg),
                    "(_is_merge: {}, _needs_finalize: {}, Streaming Preaggregation: {}, agg size: "
                    "{}, limit: {})",
                    _is_merge ? "true" : "false", _needs_finalize ? "true" : "false",

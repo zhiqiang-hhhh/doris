@@ -66,7 +66,7 @@ EngineBatchLoadTask::EngineBatchLoadTask(TPushReq& push_req, std::vector<TTablet
         : _push_req(push_req), _tablet_infos(tablet_infos) {
     _mem_tracker = std::make_shared<MemTrackerLimiter>(
             MemTrackerLimiter::Type::LOAD,
-            fmt::format("EngineBatchLoadTask#pushType={}:tabletId={}", _push_req.push_type,
+            fmt::format("EngineBatchLoadTask#pushType={}:tabletId={}", std::to_string(_push_req.push_type),
                         std::to_string(_push_req.tablet_id)));
 }
 

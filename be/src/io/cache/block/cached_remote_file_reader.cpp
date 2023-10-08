@@ -245,7 +245,7 @@ Status CachedRemoteFileReader::read_at_impl(size_t offset, Slice result, size_t*
     DCHECK(io_ctx);
     if (offset > size()) {
         return Status::InvalidArgument(
-                fmt::format("offset exceeds file size(offset: {), file size: {}, path: {})", offset,
+                fmt::format("offset exceeds file size(offset: {}, file size: {}, path: {})", offset,
                             size(), path().native()));
     }
     size_t bytes_req = result.size;

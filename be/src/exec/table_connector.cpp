@@ -105,24 +105,24 @@ Status TableConnector::convert_column_data(const vectorized::ColumnPtr& column_p
         if (table_type == TOdbcTableType::ORACLE || table_type == TOdbcTableType::SAP_HANA) {
             //if is ORACLE and date type, insert into need convert
             if (is_date) {
-                fmt::format_to(_insert_stmt_buffer, "to_date('{}','yyyy-mm-dd')", str);
+                fmt::format_to(std::back_inserter(_insert_stmt_buffer), "to_date('{}','yyyy-mm-dd')", str);
             } else {
-                fmt::format_to(_insert_stmt_buffer, "to_date('{}','yyyy-mm-dd hh24:mi:ss')", str);
+                fmt::format_to(std::back_inserter(_insert_stmt_buffer), "to_date('{}','yyyy-mm-dd hh24:mi:ss')", str);
             }
         } else if (table_type == TOdbcTableType::POSTGRESQL) {
-            fmt::format_to(_insert_stmt_buffer, "'{}'::date", str);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "'{}'::date", str);
         } else if (table_type == TOdbcTableType::SQLSERVER) {
             // Values in sqlserver should be enclosed by single quotes
-            fmt::format_to(_insert_stmt_buffer, "'{}'", str);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "'{}'", str);
         } else {
-            fmt::format_to(_insert_stmt_buffer, "\"{}\"", str);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "\"{}\"", str);
         }
     };
     const vectorized::IColumn* column = column_ptr;
     if (type_ptr->is_nullable()) {
         auto nullable_column = assert_cast<const vectorized::ColumnNullable*>(column_ptr.get());
         if (nullable_column->is_null_at(row)) {
-            fmt::format_to(_insert_stmt_buffer, "{}", "NULL");
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", "NULL");
             return Status::OK();
         }
         column = nullable_column->get_nested_column_ptr().get();
@@ -133,28 +133,28 @@ Status TableConnector::convert_column_data(const vectorized::ColumnPtr& column_p
     switch (type.type) {
     case TYPE_BOOLEAN:
         if (table_type == TOdbcTableType::SAP_HANA) {
-            fmt::format_to(_insert_stmt_buffer, "{}", *reinterpret_cast<const bool*>(item));
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", *reinterpret_cast<const bool*>(item));
         } else {
-            fmt::format_to(_insert_stmt_buffer, "{}", *reinterpret_cast<const int8_t*>(item));
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", *reinterpret_cast<const int8_t*>(item));
         }
         break;
     case TYPE_TINYINT:
-        fmt::format_to(_insert_stmt_buffer, "{}", *reinterpret_cast<const int8_t*>(item));
+        fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", *reinterpret_cast<const int8_t*>(item));
         break;
     case TYPE_SMALLINT:
-        fmt::format_to(_insert_stmt_buffer, "{}", *reinterpret_cast<const int16_t*>(item));
+        fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", *reinterpret_cast<const int16_t*>(item));
         break;
     case TYPE_INT:
-        fmt::format_to(_insert_stmt_buffer, "{}", *reinterpret_cast<const int32_t*>(item));
+        fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", *reinterpret_cast<const int32_t*>(item));
         break;
     case TYPE_BIGINT:
-        fmt::format_to(_insert_stmt_buffer, "{}", *reinterpret_cast<const int64_t*>(item));
+        fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", *reinterpret_cast<const int64_t*>(item));
         break;
     case TYPE_FLOAT:
-        fmt::format_to(_insert_stmt_buffer, "{}", *reinterpret_cast<const float*>(item));
+        fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", *reinterpret_cast<const float*>(item));
         break;
     case TYPE_DOUBLE:
-        fmt::format_to(_insert_stmt_buffer, "{}", *reinterpret_cast<const double*>(item));
+        fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", *reinterpret_cast<const double*>(item));
         break;
     case TYPE_DATE: {
         vectorized::VecDateTimeValue value =
@@ -206,9 +206,9 @@ Status TableConnector::convert_column_data(const vectorized::ColumnPtr& column_p
         if (table_type == TOdbcTableType::ORACLE || table_type == TOdbcTableType::POSTGRESQL ||
             table_type == TOdbcTableType::SAP_HANA || table_type == TOdbcTableType::MYSQL ||
             table_type == TOdbcTableType::CLICKHOUSE || table_type == TOdbcTableType::SQLSERVER) {
-            fmt::format_to(_insert_stmt_buffer, "'{}'", fmt::basic_string_view(item, size));
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "'{}'", fmt::basic_string_view(item, size));
         } else {
-            fmt::format_to(_insert_stmt_buffer, "\"{}\"", fmt::basic_string_view(item, size));
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "\"{}\"", fmt::basic_string_view(item, size));
         }
         break;
     }
@@ -222,30 +222,30 @@ Status TableConnector::convert_column_data(const vectorized::ColumnPtr& column_p
         //for doris、CK insert into --->  []
         //for PG        insert into ---> ARRAY[]
         if (table_type == TOdbcTableType::POSTGRESQL) {
-            fmt::format_to(_insert_stmt_buffer, "{}", "ARRAY[");
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", "ARRAY[");
         } else if (table_type == TOdbcTableType::CLICKHOUSE ||
                    table_type == TOdbcTableType::MYSQL) {
-            fmt::format_to(_insert_stmt_buffer, "{}", "[");
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", "[");
         }
         bool first_value = true;
         for (auto idx = arr_offset[row - 1]; idx < arr_offset[row]; ++idx) {
             if (first_value == false) {
-                fmt::format_to(_insert_stmt_buffer, "{}", ", ");
+                fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", ", ");
             }
             if (arr_nested->is_null_at(idx)) {
-                fmt::format_to(_insert_stmt_buffer, "{}", "NULL");
+                fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", "NULL");
             } else {
                 RETURN_IF_ERROR(convert_column_data(arr_nested, nested_type, type.children[0], idx,
                                                     table_type));
             }
             first_value = false;
         }
-        fmt::format_to(_insert_stmt_buffer, "{}", "]");
+        fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", "]");
         break;
     }
     case TYPE_DECIMALV2: {
         DecimalV2Value value = *(DecimalV2Value*)(item);
-        fmt::format_to(_insert_stmt_buffer, "{}", value.to_string());
+        fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", value.to_string());
         break;
     }
     case TYPE_DECIMAL32:
@@ -253,11 +253,11 @@ Status TableConnector::convert_column_data(const vectorized::ColumnPtr& column_p
     case TYPE_DECIMAL128I: {
         auto decimal_type = remove_nullable(type_ptr);
         auto val = decimal_type->to_string(*column, row);
-        fmt::format_to(_insert_stmt_buffer, "{}", val);
+        fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", val);
         break;
     }
     case TYPE_LARGEINT: {
-        fmt::format_to(_insert_stmt_buffer, "{}", *reinterpret_cast<const __int128*>(item));
+        fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", *reinterpret_cast<const __int128*>(item));
         break;
     }
     default: {

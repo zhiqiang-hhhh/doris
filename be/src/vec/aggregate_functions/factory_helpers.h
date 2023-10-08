@@ -33,7 +33,7 @@ inline void assert_unary(const std::string& name, const DataTypes& argument_type
 
 inline void assert_binary(const std::string& name, const DataTypes& argument_types) {
     CHECK_EQ(argument_types.size(), 2)
-            << fmt::format("Aggregate function {} require two arguments") << name;
+            << fmt::format("Aggregate function {} require two arguments", name);
 }
 
 template <std::size_t maximal_arity>

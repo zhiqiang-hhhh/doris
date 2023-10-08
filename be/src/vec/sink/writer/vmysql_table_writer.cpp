@@ -17,6 +17,7 @@
 
 #include "vmysql_table_writer.h"
 
+#include <fmt/format.h>
 #include <gen_cpp/DataSinks_types.h>
 #include <glog/logging.h>
 #include <mysql/mysql.h>
@@ -95,14 +96,14 @@ Status VMysqlTableWriter::open(RuntimeState* state, RuntimeProfile* profile) {
                                0);      // flags
     if (res == nullptr) {
         fmt::memory_buffer err_ss;
-        fmt::format_to(err_ss, "mysql_real_connect failed because : {}.", mysql_error(_mysql_conn));
+        fmt::format_to(std::back_inserter(err_ss), "mysql_real_connect failed because : {}.", mysql_error(_mysql_conn));
         return Status::InternalError(fmt::to_string(err_ss.data()));
     }
 
     // set character
     if (mysql_set_character_set(_mysql_conn, _conn_info.charset.c_str())) {
         fmt::memory_buffer err_ss;
-        fmt::format_to(err_ss, "mysql_set_character_set failed because : {}.",
+        fmt::format_to(std::back_inserter(err_ss), "mysql_set_character_set failed because : {}.",
                        mysql_error(_mysql_conn));
         return Status::InternalError(fmt::to_string(err_ss.data()));
     }
@@ -122,7 +123,7 @@ Status VMysqlTableWriter::append_block(vectorized::Block& block) {
 
 Status VMysqlTableWriter::_insert_row(vectorized::Block& block, size_t row) {
     _insert_stmt_buffer.clear();
-    fmt::format_to(_insert_stmt_buffer, "INSERT INTO {} VALUES (", _conn_info.table_name);
+    fmt::format_to(std::back_inserter(_insert_stmt_buffer), "INSERT INTO {} VALUES (", _conn_info.table_name);
     int num_columns = _vec_output_expr_ctxs.size();
 
     for (int i = 0; i < num_columns; ++i) {
@@ -130,7 +131,7 @@ Status VMysqlTableWriter::_insert_row(vectorized::Block& block, size_t row) {
         auto& type_ptr = block.get_by_position(i).type;
 
         if (i != 0) {
-            fmt::format_to(_insert_stmt_buffer, "{}", ", ");
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", ", ");
         }
 
         vectorized::ColumnPtr column;
@@ -138,7 +139,7 @@ Status VMysqlTableWriter::_insert_row(vectorized::Block& block, size_t row) {
             column = assert_cast<const vectorized::ColumnNullable&>(*column_ptr)
                              .get_nested_column_ptr();
             if (column_ptr->is_null_at(row)) {
-                fmt::format_to(_insert_stmt_buffer, "{}", "NULL");
+                fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", "NULL");
                 continue;
             }
         } else {
@@ -148,37 +149,37 @@ Status VMysqlTableWriter::_insert_row(vectorized::Block& block, size_t row) {
         switch (_vec_output_expr_ctxs[i]->root()->result_type()) {
         case TYPE_BOOLEAN: {
             auto& data = assert_cast<const vectorized::ColumnUInt8&>(*column).get_data();
-            fmt::format_to(_insert_stmt_buffer, "{}", data[row]);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", data[row]);
             break;
         }
         case TYPE_TINYINT: {
             auto& data = assert_cast<const vectorized::ColumnInt8&>(*column).get_data();
-            fmt::format_to(_insert_stmt_buffer, "{}", data[row]);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", data[row]);
             break;
         }
         case TYPE_SMALLINT: {
             auto& data = assert_cast<const vectorized::ColumnInt16&>(*column).get_data();
-            fmt::format_to(_insert_stmt_buffer, "{}", data[row]);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", data[row]);
             break;
         }
         case TYPE_INT: {
             auto& data = assert_cast<const vectorized::ColumnInt32&>(*column).get_data();
-            fmt::format_to(_insert_stmt_buffer, "{}", data[row]);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", data[row]);
             break;
         }
         case TYPE_BIGINT: {
             auto& data = assert_cast<const vectorized::ColumnInt64&>(*column).get_data();
-            fmt::format_to(_insert_stmt_buffer, "{}", data[row]);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", data[row]);
             break;
         }
         case TYPE_FLOAT: {
             auto& data = assert_cast<const vectorized::ColumnFloat32&>(*column).get_data();
-            fmt::format_to(_insert_stmt_buffer, "{}", data[row]);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", data[row]);
             break;
         }
         case TYPE_DOUBLE: {
             auto& data = assert_cast<const vectorized::ColumnFloat64&>(*column).get_data();
-            fmt::format_to(_insert_stmt_buffer, "{}", data[row]);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", data[row]);
             break;
         }
 
@@ -190,7 +191,7 @@ Status VMysqlTableWriter::_insert_row(vectorized::Block& block, size_t row) {
             DCHECK(string_val.data != nullptr);
             std::unique_ptr<char[]> buf(new char[2 * string_val.size + 1]);
             mysql_real_escape_string(_mysql_conn, buf.get(), string_val.data, string_val.size);
-            fmt::format_to(_insert_stmt_buffer, "'{}'", buf.get());
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "'{}'", buf.get());
 
             break;
         }
@@ -200,14 +201,14 @@ Status VMysqlTableWriter::_insert_row(vectorized::Block& block, size_t row) {
                             assert_cast<const vectorized::ColumnDecimal<vectorized::Decimal128>&>(
                                     *column)
                                     .get_data()[row];
-            fmt::format_to(_insert_stmt_buffer, "{}", value.to_string());
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", value.to_string());
             break;
         }
         case TYPE_DECIMAL32:
         case TYPE_DECIMAL64:
         case TYPE_DECIMAL128I: {
             auto val = type_ptr->to_string(*column, row);
-            fmt::format_to(_insert_stmt_buffer, "{}", val);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", val);
             break;
         }
         case TYPE_DATE:
@@ -219,7 +220,7 @@ Status VMysqlTableWriter::_insert_row(vectorized::Block& block, size_t row) {
             char buf[64];
             char* pos = value.to_string(buf);
             std::string str(buf, pos - buf - 1);
-            fmt::format_to(_insert_stmt_buffer, "'{}'", str);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "'{}'", str);
             break;
         }
         case TYPE_DATEV2: {
@@ -231,7 +232,7 @@ Status VMysqlTableWriter::_insert_row(vectorized::Block& block, size_t row) {
             char buf[64];
             char* pos = value.to_string(buf);
             std::string str(buf, pos - buf - 1);
-            fmt::format_to(_insert_stmt_buffer, "'{}'", str);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "'{}'", str);
             break;
         }
         case TYPE_DATETIMEV2: {
@@ -244,24 +245,24 @@ Status VMysqlTableWriter::_insert_row(vectorized::Block& block, size_t row) {
             char buf[64];
             char* pos = value.to_string(buf, _vec_output_expr_ctxs[i]->root()->type().scale);
             std::string str(buf, pos - buf - 1);
-            fmt::format_to(_insert_stmt_buffer, "'{}'", str);
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "'{}'", str);
             break;
         }
         default: {
             fmt::memory_buffer err_out;
-            fmt::format_to(err_out, "can't convert this type to mysql type. type = {}",
-                           _vec_output_expr_ctxs[i]->root()->type().type);
+            fmt::format_to(std::back_inserter(err_out), "can't convert this type to mysql type. type = {}",
+                           fmt::underlying(_vec_output_expr_ctxs[i]->root()->type().type));
             return Status::InternalError(fmt::to_string(err_out));
         }
         }
     }
 
-    fmt::format_to(_insert_stmt_buffer, "{}", ")");
+    fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", ")");
 
     // Insert this to MySQL server
     if (mysql_real_query(_mysql_conn, _insert_stmt_buffer.data(), _insert_stmt_buffer.size())) {
         fmt::memory_buffer err_ss;
-        fmt::format_to(err_ss, "Insert to mysql server({}) failed, because: {}.",
+        fmt::format_to(std::back_inserter(err_ss), "Insert to mysql server({}) failed, because: {}.",
                        mysql_get_host_info(_mysql_conn), mysql_error(_mysql_conn));
         return Status::InternalError(fmt::to_string(err_ss));
     }

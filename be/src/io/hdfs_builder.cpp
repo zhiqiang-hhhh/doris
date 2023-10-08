@@ -17,6 +17,7 @@
 
 #include "io/hdfs_builder.h"
 
+#include <fmt/core.h>
 #include <fmt/format.h>
 #include <gen_cpp/PlanNodes_types.h>
 
@@ -54,12 +55,12 @@ Status HDFSCommonBuilder::run_kinit() {
     std::string krb_home_str(krb_home ? krb_home : "");
     fmt::memory_buffer kinit_command;
     if (krb_home_str.empty()) {
-        fmt::format_to(kinit_command, "kinit -c {} -R -t {} -k {}", ticket_path,
+        fmt::format_to(std::back_inserter(kinit_command), "kinit -c {} -R -t {} -k {}", ticket_path,
                        hdfs_kerberos_keytab, hdfs_kerberos_principal);
     } else {
         // Assign kerberos home in env, get kinit in kerberos home
-        fmt::format_to(kinit_command, krb_home_str + "/bin/kinit -c {} -R -t {} -k {}", ticket_path,
-                       hdfs_kerberos_keytab, hdfs_kerberos_principal);
+        fmt::format_to(std::back_inserter(kinit_command), fmt::runtime(krb_home_str + "/bin/kinit -c {} -R -t {} -k {}"), 
+                       ticket_path, hdfs_kerberos_keytab, hdfs_kerberos_principal);
     }
     VLOG_NOTICE << "kinit command: " << fmt::to_string(kinit_command);
     std::string msg;

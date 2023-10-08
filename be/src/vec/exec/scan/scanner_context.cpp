@@ -392,9 +392,9 @@ std::string ScannerContext::debug_string() {
             " status: {}, _should_stop: {}, _is_finished: {}, free blocks: {},"
             " limit: {}, _num_running_scanners: {}, _num_scheduling_ctx: {}, _max_thread_num: {},"
             " _block_per_scanner: {}, _cur_bytes_in_queue: {}, MAX_BYTE_OF_QUEUE: {}",
-            ctx_id, _scanners.size(), _blocks_queue.size(), status().ok(), _should_stop,
-            _is_finished, _free_blocks.size_approx(), limit, _num_running_scanners,
-            _num_scheduling_ctx, _max_thread_num, _block_per_scanner, _cur_bytes_in_queue,
+            ctx_id, _scanners.size(), _blocks_queue.size(), status().ok(), _should_stop.load(),
+            _is_finished.load(), _free_blocks.size_approx(), limit, _num_running_scanners.load(),
+            _num_scheduling_ctx.load(), _max_thread_num, _block_per_scanner, _cur_bytes_in_queue,
             _max_bytes_in_queue);
 }
 

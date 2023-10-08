@@ -241,7 +241,7 @@ Status BetaRowsetWriter::_find_longest_consecutive_small_segment(
     if (VLOG_DEBUG_IS_ON) {
         vlog_buffer.clear();
         for (auto& segment : (*segments.get())) {
-            fmt::format_to(vlog_buffer, "[id:{} num_rows:{}]", segment->id(), segment->num_rows());
+            fmt::format_to(std::back_inserter(vlog_buffer), "[id:{} num_rows:{}]", segment->id(), segment->num_rows());
         }
         VLOG_DEBUG << "candidate segments num:" << s
                    << " list of candidates:" << fmt::to_string(vlog_buffer);

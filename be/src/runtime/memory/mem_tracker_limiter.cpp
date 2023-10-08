@@ -309,7 +309,7 @@ std::string MemTrackerLimiter::process_mem_log_str() {
             MemInfo::sys_mem_available_str(),
             PrettyPrinter::print(MemInfo::sys_mem_available_low_water_mark(), TUnit::BYTES),
             PrettyPrinter::print(MemInfo::sys_mem_available_warning_water_mark(), TUnit::BYTES),
-            MemInfo::refresh_interval_memory_growth);
+            MemInfo::refresh_interval_memory_growth.load());
 }
 
 std::string MemTrackerLimiter::process_limit_exceeded_errmsg_str() {

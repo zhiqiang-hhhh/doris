@@ -50,7 +50,7 @@ public:
     template <typename T>
     void write_number(T data) {
         fmt::memory_buffer buffer;
-        fmt::format_to(buffer, "{}", data);
+        fmt::format_to(std::back_inserter(buffer), "{}", data);
         write(buffer.data(), buffer.size());
     }
 

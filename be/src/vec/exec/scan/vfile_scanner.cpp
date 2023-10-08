@@ -565,7 +565,7 @@ Status VFileScanner::_convert_to_output_block(Block* block) {
                                                     i);
                                     std::string raw_string = raw_value.to_string();
                                     fmt::memory_buffer error_msg;
-                                    fmt::format_to(error_msg,
+                                    fmt::format_to(std::back_inserter(error_msg),
                                                    "column({}) value is incorrect while strict "
                                                    "mode is {}, "
                                                    "src value is {}",
@@ -581,7 +581,7 @@ Status VFileScanner::_convert_to_output_block(Block* block) {
                                 },
                                 [&]() -> std::string {
                                     fmt::memory_buffer error_msg;
-                                    fmt::format_to(error_msg,
+                                    fmt::format_to(std::back_inserter(error_msg),
                                                    "column({}) values is null while columns is not "
                                                    "nullable",
                                                    slot_desc->col_name());
@@ -866,7 +866,7 @@ Status VFileScanner::_get_next_reader() {
         if (VLOG_NOTICE_IS_ON && !_missing_cols.empty() && _is_load) {
             fmt::memory_buffer col_buf;
             for (auto& col : _missing_cols) {
-                fmt::format_to(col_buf, " {}", col);
+                fmt::format_to(std::back_inserter(col_buf), " {}", col);
             }
             VLOG_NOTICE << fmt::format("Unknown columns:{} in file {}", fmt::to_string(col_buf),
                                        range.path);

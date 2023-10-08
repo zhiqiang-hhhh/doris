@@ -152,7 +152,7 @@ std::string DataTypeNumberBase<T>::to_string(const IColumn& column, size_t row_n
         return std::to_string(assert_cast<const ColumnVector<T>&>(*ptr).get_element(row_num));
     } else if constexpr (std::numeric_limits<T>::is_iec559) {
         fmt::memory_buffer buffer; // only use in size-predictable type.
-        fmt::format_to(buffer, "{}",
+        fmt::format_to(std::back_inserter(buffer), "{}",
                        assert_cast<const ColumnVector<T>&>(*ptr).get_element(row_num));
         return std::string(buffer.data(), buffer.size());
     }

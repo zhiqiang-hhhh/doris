@@ -88,7 +88,7 @@ Status ODBCConnector::append(vectorized::Block* block,
     _insert_stmt_buffer.clear();
     std::u16string insert_stmt;
     SCOPED_TIMER(_convert_tuple_timer);
-    fmt::format_to(_insert_stmt_buffer, "INSERT INTO {} VALUES (", _table_name);
+    fmt::format_to(std::back_inserter(_insert_stmt_buffer), "INSERT INTO {} VALUES (", _table_name);
 
     int num_rows = block->rows();
     int num_columns = block->columns();
@@ -98,7 +98,7 @@ Status ODBCConnector::append(vectorized::Block* block,
         // Construct insert statement of odbc/jdbc table
         for (int j = 0; j < num_columns; ++j) {
             if (j != 0) {
-                fmt::format_to(_insert_stmt_buffer, "{}", ", ");
+                fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", ", ");
             }
             auto& column_ptr = block->get_by_position(j).column;
             auto& type_ptr = block->get_by_position(j).type;
@@ -107,10 +107,10 @@ Status ODBCConnector::append(vectorized::Block* block,
         }
 
         if (i < num_rows - 1 && _insert_stmt_buffer.size() < INSERT_BUFFER_SIZE) {
-            fmt::format_to(_insert_stmt_buffer, "{}", "),(");
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", "),(");
         } else {
             // batch exhausted or _insert_stmt_buffer is full, need to do real insert stmt
-            fmt::format_to(_insert_stmt_buffer, "{}", ")");
+            fmt::format_to(std::back_inserter(_insert_stmt_buffer), "{}", ")");
             break;
         }
     }

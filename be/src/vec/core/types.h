@@ -21,6 +21,7 @@
 #pragma once
 
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <string>
 #include <vector>
@@ -393,7 +394,7 @@ struct Decimal {
     std::string to_string(UInt32 scale) const {
         if (value == std::numeric_limits<T>::min()) {
             fmt::memory_buffer buffer;
-            fmt::format_to(buffer, "{}", value);
+            fmt::format_to(std::back_inserter(buffer), "{}", value);
             std::string res {buffer.data(), buffer.size()};
             res.insert(res.size() - scale, ".");
             return res;

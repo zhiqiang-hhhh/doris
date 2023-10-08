@@ -522,9 +522,9 @@ std::string Block::dump_one_line(size_t row, int column_end) const {
     for (int i = 0; i < column_end; ++i) {
         if (LIKELY(i != 0)) {
             // TODO: need more effective function of to string. now the impl is slow
-            fmt::format_to(line, " {}", data[i].to_string(row));
+            fmt::format_to(std::back_inserter(line), " {}", data[i].to_string(row));
         } else {
-            fmt::format_to(line, "{}", data[i].to_string(row));
+            fmt::format_to(std::back_inserter(line), "{}", data[i].to_string(row));
         }
     }
     return fmt::to_string(line);
