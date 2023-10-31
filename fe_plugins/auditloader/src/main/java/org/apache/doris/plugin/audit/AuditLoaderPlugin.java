@@ -18,6 +18,7 @@
 package org.apache.doris.plugin.audit;
 
 import org.apache.doris.common.Config;
+import org.apache.doris.catalog.Env;
 import org.apache.doris.plugin.AuditEvent;
 import org.apache.doris.plugin.AuditPlugin;
 import org.apache.doris.plugin.Plugin;
@@ -84,7 +85,6 @@ public class AuditLoaderPlugin extends Plugin implements AuditPlugin {
             this.lastLoadTimeSlowLog = System.currentTimeMillis();
 
             loadConfig(ctx, info.getProperties());
-
             this.auditEventQueue = Queues.newLinkedBlockingDeque(conf.maxQueueSize);
             this.streamLoader = new DorisStreamLoader(conf);
             this.loadThread = new Thread(new LoadWorker(this.streamLoader), "audit loader thread");
@@ -209,7 +209,10 @@ public class AuditLoaderPlugin extends Plugin implements AuditPlugin {
         if (logBuffer.length() >= conf.maxBatchSize || currentTime - lastLoadTime >= conf.maxBatchIntervalSec * 1000) {         
             // begin to load
             try {
-                DorisStreamLoader.LoadResponse response = loader.loadBatch(logBuffer, slowLog);
+                // LoadManager loadManager = Env.getCurrentEnv().getLoadManager();
+                // TokenManager tokenManager = loadManager.getTokenManager();
+                String token = "TestToken";
+                DorisStreamLoader.LoadResponse response = loader.loadBatch(logBuffer, slowLog, token);
                 LOG.debug("audit loader response: {}", response);
             } catch (Exception e) {
                 LOG.debug("encounter exception when putting current audit batch, discard current batch", e);
@@ -253,8 +256,8 @@ public class AuditLoaderPlugin extends Plugin implements AuditPlugin {
         public long maxBatchIntervalSec = 60;
         public int maxQueueSize = 1000;
         public String frontendHostPort = "127.0.0.1:8030";
-        public String user = "root";
-        public String password = "";
+        // public String user = "root";
+        // public String password = "";
         public String database = "doris_audit_db__";
         public String auditLogTable = "doris_audit_log_tbl__";
         public String slowLogTable = "doris_slow_log_tbl__";
@@ -277,12 +280,12 @@ public class AuditLoaderPlugin extends Plugin implements AuditPlugin {
                 if (properties.containsKey(PROP_FRONTEND_HOST_PORT)) {
                     frontendHostPort = properties.get(PROP_FRONTEND_HOST_PORT);
                 }
-                if (properties.containsKey(PROP_USER)) {
-                    user = properties.get(PROP_USER);
-                }
-                if (properties.containsKey(PROP_PASSWORD)) {
-                    password = properties.get(PROP_PASSWORD);
-                }
+                // if (properties.containsKey(PROP_USER)) {
+                //     user = properties.get(PROP_USER);
+                // }
+                // if (properties.containsKey(PROP_PASSWORD)) {
+                //     password = properties.get(PROP_PASSWORD);
+                // }
                 if (properties.containsKey(PROP_DATABASE)) {
                     database = properties.get(PROP_DATABASE);
                 }

@@ -26,8 +26,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Calendar;
 
 public class DorisStreamLoader {
@@ -37,11 +35,11 @@ public class DorisStreamLoader {
     private String db;
     private String auditLogTbl;
     private String slowLogTbl;
-    private String user;
-    private String passwd;
+    // private String user;
+    // private String passwd;
     private String auditLogLoadUrlStr;
     private String slowLogLoadUrlStr;
-    private String authEncoding;
+    // private String authEncoding;
     private String feIdentity;
 
     public DorisStreamLoader(AuditLoaderPlugin.AuditLoaderConf conf) {
@@ -49,22 +47,23 @@ public class DorisStreamLoader {
         this.db = conf.database;
         this.auditLogTbl = conf.auditLogTable;
         this.slowLogTbl = conf.slowLogTable;
-        this.user = conf.user;
-        this.passwd = conf.password;
+        // this.user = conf.user;
+        // this.passwd = conf.password;
 
         this.auditLogLoadUrlStr = String.format(loadUrlPattern, hostPort, db, auditLogTbl);
         this.slowLogLoadUrlStr = String.format(loadUrlPattern, hostPort, db, slowLogTbl);
-        this.authEncoding = Base64.getEncoder().encodeToString(String.format("%s:%s", user, passwd).getBytes(StandardCharsets.UTF_8));
+        // this.authEncoding = Base64.getEncoder().encodeToString(String.format("%s:%s", user, passwd).getBytes(StandardCharsets.UTF_8));
         // currently, FE identity is FE's IP, so we replace the "." in IP to make it suitable for label
         this.feIdentity = conf.feIdentity.replaceAll("\\.", "_");
     }
 
-    private HttpURLConnection getConnection(String urlStr, String label) throws IOException {
+    private HttpURLConnection getConnection(String urlStr, String label, String clusterToken) throws IOException {
         URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setInstanceFollowRedirects(false);
         conn.setRequestMethod("PUT");
-        conn.setRequestProperty("Authorization", "Basic " + authEncoding);
+        conn.setRequestProperty("token", clusterToken);
+        // conn.setRequestProperty("Authorization", "Basic " + authEncoding);
         conn.addRequestProperty("Expect", "100-continue");
         conn.addRequestProperty("Content-Type", "text/plain; charset=UTF-8");
 
@@ -83,7 +82,8 @@ public class DorisStreamLoader {
     private String toCurl(HttpURLConnection conn) {
         StringBuilder sb = new StringBuilder("curl -v ");
         sb.append("-X ").append(conn.getRequestMethod()).append(" \\\n  ");
-        sb.append("-H \"").append("Authorization\":").append("\"Basic " + authEncoding).append("\" \\\n  ");
+        // sb.append("-H \"").append("token\":").append(token).append("\" \\\n  ");
+        // sb.append("-H \"").append("Authorization\":").append("\"Basic " + authEncoding).append("\" \\\n  ");
         sb.append("-H \"").append("Expect\":").append("\"100-continue\" \\\n  ");
         sb.append("-H \"").append("Content-Type\":").append("\"text/plain; charset=UTF-8\" \\\n  ");
         sb.append("-H \"").append("max_filter_ratio\":").append("\"1.0\" \\\n  ");
@@ -114,7 +114,7 @@ public class DorisStreamLoader {
         return response.toString();
     }
 
-    public LoadResponse loadBatch(StringBuilder sb, boolean slowLog) {
+    public LoadResponse loadBatch(StringBuilder sb, boolean slowLog, String clusterToken) {
         Calendar calendar = Calendar.getInstance();
         String label = String.format("_log_%s%02d%02d_%02d%02d%02d_%s",
                 calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1, calendar.get(Calendar.DAY_OF_MONTH),
@@ -127,10 +127,10 @@ public class DorisStreamLoader {
             // build request and send to fe
             if (slowLog) {
                 label = "slow" + label;
-                feConn = getConnection(slowLogLoadUrlStr, label);
+                feConn = getConnection(slowLogLoadUrlStr, label, clusterToken);
             } else {
                 label = "audit" + label;
-                feConn = getConnection(auditLogLoadUrlStr, label);
+                feConn = getConnection(auditLogLoadUrlStr, label, clusterToken);
             }
             int status = feConn.getResponseCode();
             // fe send back http response code TEMPORARY_REDIRECT 307 and new be location
@@ -143,7 +143,7 @@ public class DorisStreamLoader {
                 throw new Exception("redirect location is null");
             }
             // build request and send to new be location
-            beConn = getConnection(location, label);
+            beConn = getConnection(location, label, clusterToken);
             // send data to be
             try (BufferedOutputStream bos = new BufferedOutputStream(beConn.getOutputStream())) {
                 bos.write(sb.toString().getBytes());
