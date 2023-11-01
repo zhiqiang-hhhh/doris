@@ -18,6 +18,8 @@
 package org.apache.doris.plugin.audit;
 
 import org.apache.doris.common.Config;
+import org.apache.doris.load.loadv2.LoadManager;
+import org.apache.doris.load.loadv2.TokenManager;
 import org.apache.doris.catalog.Env;
 import org.apache.doris.plugin.AuditEvent;
 import org.apache.doris.plugin.AuditPlugin;
@@ -209,9 +211,9 @@ public class AuditLoaderPlugin extends Plugin implements AuditPlugin {
         if (logBuffer.length() >= conf.maxBatchSize || currentTime - lastLoadTime >= conf.maxBatchIntervalSec * 1000) {         
             // begin to load
             try {
-                // LoadManager loadManager = Env.getCurrentEnv().getLoadManager();
-                // TokenManager tokenManager = loadManager.getTokenManager();
-                String token = "TestToken";
+                LoadManager loadManager = Env.getCurrentEnv().getLoadManager();
+                TokenManager tokenManager = loadManager.getTokenManager();
+                String token = tokenManager.acquireToken();
                 DorisStreamLoader.LoadResponse response = loader.loadBatch(logBuffer, slowLog, token);
                 LOG.debug("audit loader response: {}", response);
             } catch (Exception e) {
