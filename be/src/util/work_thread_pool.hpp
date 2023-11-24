@@ -110,6 +110,8 @@ public:
 
     virtual uint32_t get_queue_size() const { return _work_queue.get_size(); }
     virtual uint32_t get_active_threads() const { return _active_threads; }
+    virtual uint64_t get_waiting_times() const { return _work_queue.get_waiting_times(); }
+    virtual uint64_t put_waiting_times() const { return _work_queue.put_waiting_times(); }
 
     // Blocks until the work queue is empty, and then calls shutdown to stop the worker
     // threads and Join to wait until they are finished.

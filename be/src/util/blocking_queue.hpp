@@ -42,8 +42,9 @@ public:
               _max_elements(max_elements),
               _total_get_wait_time(0),
               _total_put_wait_time(0),
-              _get_waiting(0),
-              _put_waiting(0) {}
+              _get_waiting_counter(0),
+              _put_waiting_counter(0),
+              _current_queue_size(0) {}
 
     // Get an element from the queue, waiting indefinitely for one to become available.
     // Returns false if we were shut down prior to getting the element, and there
@@ -53,7 +54,7 @@ public:
         timer.start();
         std::unique_lock<std::mutex> unique_lock(_lock);
         while (!(_shutdown || !_list.empty())) {
-            ++_get_waiting;
+            ++_get_waiting_counter;
             _get_cv.wait(unique_lock);
         }
         _total_get_wait_time += timer.elapsed_time();
@@ -61,8 +62,9 @@ public:
         if (!_list.empty()) {
             *out = _list.front();
             _list.pop_front();
-            if (_put_waiting > 0) {
-                --_put_waiting;
+            --_current_queue_size;
+            if (_put_waiting_counter > 0) {
+                --_put_waiting_counter;
                 unique_lock.unlock();
                 _put_cv.notify_one();
             }
@@ -80,7 +82,7 @@ public:
         timer.start();
         std::unique_lock<std::mutex> unique_lock(_lock);
         while (!(_shutdown || _list.size() < _max_elements)) {
-            ++_put_waiting;
+            ++_put_waiting_counter;
             _put_cv.wait(unique_lock);
         }
         _total_put_wait_time += timer.elapsed_time();
@@ -90,8 +92,10 @@ public:
         }
 
         _list.push_back(val);
-        if (_get_waiting > 0) {
-            --_get_waiting;
+        ++_current_queue_size;
+
+        if (_get_waiting_counter > 0) {
+            --_get_waiting_counter;
             unique_lock.unlock();
             _get_cv.notify_one();
         }
@@ -114,8 +118,10 @@ public:
         }
 
         _list.push_back(val);
-        if (_get_waiting > 0) {
-            --_get_waiting;
+        _current_queue_size += 1;
+
+        if (_get_waiting_counter > 0) {
+            --_get_waiting_counter;
             unique_lock.unlock();
             _get_cv.notify_one();
         }
@@ -133,10 +139,11 @@ public:
         _put_cv.notify_all();
     }
 
-    uint32_t get_size() const {
-        std::lock_guard<std::mutex> l(_lock);
-        return _list.size();
-    }
+    uint64_t get_waiting_times() const { return _get_waiting_counter.load(); }
+
+    uint64_t put_waiting_times() const { return _put_waiting_counter.load(); }
+
+    uint32_t get_size() const { return _current_queue_size.load(); }
 
     uint32_t get_capacity() const { return _max_elements; }
 
@@ -156,8 +163,9 @@ private:
     std::list<T> _list;
     std::atomic<uint64_t> _total_get_wait_time;
     std::atomic<uint64_t> _total_put_wait_time;
-    size_t _get_waiting;
-    size_t _put_waiting;
+    std::atomic<uint64_t> _get_waiting_counter;
+    std::atomic<uint64_t> _put_waiting_counter;
+    std::atomic<uint32_t> _current_queue_size;
 };
 
 } // namespace doris

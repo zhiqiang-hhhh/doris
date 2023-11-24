@@ -146,6 +146,11 @@ DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(light_work_pool_max_queue_size, MetricUnit::N
 DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(heavy_work_max_threads, MetricUnit::NOUNIT);
 DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(light_work_max_threads, MetricUnit::NOUNIT);
 
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(heavy_work_pool_get_wait_times, MetricUnit::NOUNIT);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(heavy_work_pool_put_wait_times, MetricUnit::NOUNIT);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(light_work_pool_get_wait_times, MetricUnit::NOUNIT);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(light_work_pool_put_wait_times, MetricUnit::NOUNIT);
+
 bthread_key_t btls_key;
 
 static void thread_context_deleter(void* d) {
@@ -228,6 +233,15 @@ PInternalServiceImpl::PInternalServiceImpl(ExecEnv* exec_env)
     REGISTER_HOOK_METRIC(light_work_max_threads,
                          []() { return config::brpc_light_work_pool_threads; });
 
+    REGISTER_HOOK_METRIC(heavy_work_pool_get_wait_times,
+                         [this]() { return _heavy_work_pool.get_waiting_times(); })
+    REGISTER_HOOK_METRIC(heavy_work_pool_put_wait_times,
+                         [this]() { return _heavy_work_pool.put_waiting_times(); })
+    REGISTER_HOOK_METRIC(light_work_pool_get_wait_times,
+                         [this]() { return _light_work_pool.get_waiting_times(); })
+    REGISTER_HOOK_METRIC(light_work_pool_put_wait_times,
+                         [this]() { return _light_work_pool.put_waiting_times(); })
+
     CHECK_EQ(0, bthread_key_create(&btls_key, thread_context_deleter));
     CHECK_EQ(0, bthread_key_create(&AsyncIO::btls_io_ctx_key, AsyncIO::io_ctx_key_deleter));
 }
@@ -242,6 +256,11 @@ PInternalServiceImpl::~PInternalServiceImpl() {
     DEREGISTER_HOOK_METRIC(light_work_pool_max_queue_size);
     DEREGISTER_HOOK_METRIC(heavy_work_max_threads);
     DEREGISTER_HOOK_METRIC(light_work_max_threads);
+
+    DEREGISTER_HOOK_METRIC(heavy_work_pool_get_wait_times);
+    DEREGISTER_HOOK_METRIC(heavy_work_pool_put_wait_times);
+    DEREGISTER_HOOK_METRIC(light_work_pool_get_wait_times);
+    DEREGISTER_HOOK_METRIC(light_work_pool_put_wait_times);
 
     CHECK_EQ(0, bthread_key_delete(btls_key));
     CHECK_EQ(0, bthread_key_delete(AsyncIO::btls_io_ctx_key));

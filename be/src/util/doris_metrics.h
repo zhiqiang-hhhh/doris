@@ -218,15 +218,19 @@ public:
     IntCounter* upload_rowset_count;
     IntCounter* upload_fail_count;
 
-    UIntGauge* light_work_pool_queue_size;
-    UIntGauge* heavy_work_pool_queue_size;
     UIntGauge* heavy_work_active_threads;
-    UIntGauge* light_work_active_threads;
-
-    UIntGauge* heavy_work_pool_max_queue_size;
-    UIntGauge* light_work_pool_max_queue_size;
     UIntGauge* heavy_work_max_threads;
+    UIntGauge* heavy_work_pool_get_wait_times;
+    UIntGauge* heavy_work_pool_put_wait_times;
+    UIntGauge* heavy_work_pool_queue_size;
+    UIntGauge* heavy_work_pool_max_queue_size;
+
+    UIntGauge* light_work_active_threads;
     UIntGauge* light_work_max_threads;
+    UIntGauge* light_work_pool_get_wait_times;
+    UIntGauge* light_work_pool_put_wait_times;
+    UIntGauge* light_work_pool_queue_size;
+    UIntGauge* light_work_pool_max_queue_size;
 
     UIntGauge* flush_thread_pool_queue_size;
     UIntGauge* flush_thread_pool_thread_num;
