@@ -900,7 +900,7 @@ public class Coordinator {
         if (leftTimeMs <= 0) {
             long elapsed = (System.currentTimeMillis() - timeoutDeadline) / 1000 + queryOptions.getExecutionTimeout();
             String msg = String.format(
-                    "timeout before waiting {} rpc, query timeout: {}, already elapsed:{}, left for this:{}",
+                    "timeout before waiting %s rpc, query timeout: %d, already elapsed:%d, left for this:%d",
                         operation, queryOptions.getExecutionTimeout(), elapsed, leftTimeMs);
 
             LOG.warn("Query {} {}", DebugUtil.printId(queryId), msg);
@@ -933,8 +933,8 @@ public class Coordinator {
             } catch (TimeoutException e) {
                 exception = e;
                 errMsg = String.format(
-                    "timeout when waiting for {} rpc, query timeout {}, left timeout for this operation: {}",
-                    operation, queryOptions.getExecutionTimeout(), timeoutMs / 10000);
+                    "timeout when waiting for %s rpc, query timeout %d, left timeout for this operation: %d",
+                    operation, queryOptions.getExecutionTimeout(), timeoutMs / 1000);
                 LOG.warn("Query {} {}", DebugUtil.printId(queryId), errMsg);
                 code = TStatusCode.TIMEOUT;
             }
@@ -975,7 +975,7 @@ public class Coordinator {
         if (leftTimeMs <= 0) {
             long elapsed = (System.currentTimeMillis() - timeoutDeadline) / 1000 + queryOptions.getExecutionTimeout();
             String msg = String.format(
-                    "timeout before waiting {} rpc, query timeout: {}, already elapsed:{}, left for this:{}",
+                    "timeout before waiting %s rpc, query timeout:%d, already elapsed:%d, left for this:%d",
                     operation, queryOptions.getExecutionTimeout(), elapsed, leftTimeMs);
             LOG.warn("Query {} {}", DebugUtil.printId(queryId), msg);
             throw new UserException(msg);
@@ -1007,8 +1007,8 @@ public class Coordinator {
             } catch (TimeoutException e) {
                 exception = e;
                 errMsg = String.format(
-                    "timeout when waiting for {} rpc, query timeout {}, left timeout for this operation: {}",
-                                            operation, queryOptions.getExecutionTimeout(), timeoutMs / 10000);
+                    "timeout when waiting for %s rpc, query timeout %d, left timeout for this operation: %d",
+                                            operation, queryOptions.getExecutionTimeout(), timeoutMs / 1000);
                 LOG.warn("Query {} {}", DebugUtil.printId(queryId), errMsg);
                 code = TStatusCode.TIMEOUT;
             }

@@ -850,6 +850,7 @@ Status FragmentMgr::exec_plan_fragment(const TExecPlanFragmentParams& params,
 
 Status FragmentMgr::exec_plan_fragment(const TPipelineFragmentParams& params,
                                        const FinishCallback& cb) {
+    LOG_INFO("Begin preparing fragment of query {} in pthread", print_id(params.query_id));
     auto tracer = telemetry::is_current_span_valid() ? telemetry::get_tracer("tracer")
                                                      : telemetry::get_noop_tracer();
     auto cur_span = opentelemetry::trace::Tracer::GetCurrentSpan();
@@ -956,6 +957,8 @@ Status FragmentMgr::exec_plan_fragment(const TPipelineFragmentParams& params,
                 }
             }
         }
+
+        LOG_INFO("Finish prepare fragment of query {} in pthread", print_id(params.query_id));
         return Status::OK();
     } else {
         return pre_and_submit(0);
