@@ -898,8 +898,13 @@ public class Coordinator {
                          long leftTimeMs,
             String operation) throws RpcException, UserException {
         if (leftTimeMs <= 0) {
-            throw new UserException("timeout before waiting for " + operation + " RPC. Elapse(sec): " + (
-                    (System.currentTimeMillis() - timeoutDeadline) / 1000 + queryOptions.getExecutionTimeout()));
+            long elapsed = (System.currentTimeMillis() - timeoutDeadline) / 1000 + queryOptions.getExecutionTimeout();
+            String msg = String.format(
+                    "timeout before waiting {} rpc, query timeout: {}, already elapsed:{}, left for this:{}",
+                        operation, queryOptions.getExecutionTimeout(), elapsed, leftTimeMs);
+
+            LOG.warn("Query {} {}", DebugUtil.printId(queryId), msg);
+            throw new UserException(msg);
         }
 
         long timeoutMs = Math.min(leftTimeMs, Config.remote_fragment_exec_timeout_ms);
@@ -927,7 +932,10 @@ public class Coordinator {
                 code = TStatusCode.INTERNAL_ERROR;
             } catch (TimeoutException e) {
                 exception = e;
-                errMsg = "timeout when waiting for " + operation + " RPC. Wait(sec): " + timeoutMs / 1000;
+                errMsg = String.format(
+                    "timeout when waiting for {} rpc, query timeout {}, left timeout for this operation: {}",
+                    operation, queryOptions.getExecutionTimeout(), timeoutMs / 10000);
+                LOG.warn("Query {} {}", DebugUtil.printId(queryId), errMsg);
                 code = TStatusCode.TIMEOUT;
             }
 
@@ -965,8 +973,12 @@ public class Coordinator {
             Future<PExecPlanFragmentResult>>> futures, long leftTimeMs,
             String operation) throws RpcException, UserException {
         if (leftTimeMs <= 0) {
-            throw new UserException("timeout before waiting for " + operation + " RPC. Elapse(sec): " + (
-                    (System.currentTimeMillis() - timeoutDeadline) / 1000 + queryOptions.query_timeout));
+            long elapsed = (System.currentTimeMillis() - timeoutDeadline) / 1000 + queryOptions.getExecutionTimeout();
+            String msg = String.format(
+                    "timeout before waiting {} rpc, query timeout: {}, already elapsed:{}, left for this:{}",
+                    operation, queryOptions.getExecutionTimeout(), elapsed, leftTimeMs);
+            LOG.warn("Query {} {}", DebugUtil.printId(queryId), msg);
+            throw new UserException(msg);
         }
 
         long timeoutMs = Math.min(leftTimeMs, Config.remote_fragment_exec_timeout_ms);
@@ -994,7 +1006,10 @@ public class Coordinator {
                 code = TStatusCode.INTERNAL_ERROR;
             } catch (TimeoutException e) {
                 exception = e;
-                errMsg = "timeout when waiting for " + operation + " RPC. Wait(sec): " + timeoutMs / 1000;
+                errMsg = String.format(
+                    "timeout when waiting for {} rpc, query timeout {}, left timeout for this operation: {}",
+                                            operation, queryOptions.getExecutionTimeout(), timeoutMs / 10000);
+                LOG.warn("Query {} {}", DebugUtil.printId(queryId), errMsg);
                 code = TStatusCode.TIMEOUT;
             }
 
