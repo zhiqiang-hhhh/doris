@@ -2223,6 +2223,13 @@ public class Coordinator implements CoordInterface {
                 LOG.warn("one instance report fail, query_id={} instance_id={}, error message: {}",
                         DebugUtil.printId(queryId), DebugUtil.printId(params.getFragmentInstanceId()),
                         status.getErrorMsg());
+                LOG.info("DEBUG, query {} instance {} sleep 5 secs", DebugUtil.printId(queryId), DebugUtil.printId(params.getFragmentInstanceId()));
+                try {
+                    Thread.sleep(5000); // 休眠5秒
+                } catch (InterruptedException e) {
+                    LOG.error(e.getMessage());
+                }
+                LOG.info("DEBUG, query {} instance {} sleep finished", DebugUtil.printId(queryId), DebugUtil.printId(params.getFragmentInstanceId()));    
                 updateStatus(status, params.getFragmentInstanceId());
             }
             if (ctx.fragmentInstancesMap.get(params.fragment_instance_id).getIsDone()) {

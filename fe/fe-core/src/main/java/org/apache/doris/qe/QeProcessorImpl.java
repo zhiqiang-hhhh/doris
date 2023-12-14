@@ -197,8 +197,9 @@ public final class QeProcessorImpl implements QeProcessor {
             } else {
                 result.setStatus(new TStatus(TStatusCode.RUNTIME_ERROR));
             }
-            LOG.warn("ReportExecStatus() runtime error, query {} with type {} does not exist",
-                    DebugUtil.printId(params.query_id), params.query_type);
+            LOG.warn("ReportExecStatus() runtime error, query {} with type {} does not exist, instance {}",
+                    DebugUtil.printId(params.query_id), params.query_type,
+                    DebugUtil.printId(params.fragment_instance_id));
             return result;
         }
         try {
