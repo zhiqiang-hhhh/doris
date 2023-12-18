@@ -113,6 +113,7 @@ Status VSetOperationNode<is_intersect>::alloc_resource(RuntimeState* state) {
 
 template <bool is_intersect>
 Status VSetOperationNode<is_intersect>::open(RuntimeState* state) {
+    LOG_INFO("VSetOperationNode<{}> doing open", is_intersect);
     SCOPED_TIMER(_runtime_profile->total_time_counter());
     RETURN_IF_ERROR(ExecNode::open(state));
 
@@ -121,6 +122,7 @@ Status VSetOperationNode<is_intersect>::open(RuntimeState* state) {
     bool eos = false;
     Status st = Status::OK();
     for (int i = 1; i < _children.size(); ++i) {
+        LOG_INFO("VSetOperationNode<{}> is opening its {}-th child", is_intersect, i);
         RETURN_IF_ERROR(child(i)->open(state));
         eos = false;
 
@@ -133,6 +135,7 @@ Status VSetOperationNode<is_intersect>::open(RuntimeState* state) {
                                       ExecNode::get_next,
                               _children[i], std::placeholders::_1, std::placeholders::_2,
                               std::placeholders::_3)));
+            LOG_INFO("VSetOperationNode<{}> is sink probe its {}-th child", is_intersect, i);
             RETURN_IF_ERROR(sink_probe(state, i, &_probe_block, eos));
         }
     }
@@ -224,6 +227,8 @@ void VSetOperationNode<is_intersect>::hash_table_init() {
 template <bool is_intersect>
 Status VSetOperationNode<is_intersect>::sink(RuntimeState* state, Block* block, bool eos) {
     SCOPED_TIMER(_exec_timer);
+    LOG_INFO("Operator VSetOperationNode<{}> building hash table, new block rows {}", is_intersect,
+             block->rows());
 
     if (block->rows() != 0) {
         RETURN_IF_ERROR(_mutable_block.merge(*block));
@@ -231,12 +236,18 @@ Status VSetOperationNode<is_intersect>::sink(RuntimeState* state, Block* block, 
             return Status::NotSupported("set operator do not support build table rows over:" +
                                         std::to_string(std::numeric_limits<uint32_t>::max()));
         }
+        LOG_INFO("Operator VSetOperationNode<{}> building hash table, 2 after merge rows {}",
+                 is_intersect, _mutable_block.rows());
     }
 
     if (eos) {
         if (!_mutable_block.empty()) {
             _build_block = _mutable_block.to_block();
         }
+        LOG_INFO(
+                "Operator VSetOperationNode<{}> building hash table, got eos, processing build "
+                "block {}",
+                is_intersect, _build_block.rows());
         RETURN_IF_ERROR(process_build_block(_build_block, state));
         _mutable_block.clear();
 
@@ -254,6 +265,10 @@ Status VSetOperationNode<is_intersect>::sink(RuntimeState* state, Block* block, 
         }
         _build_finished = true;
         _can_read = _children.size() == 1;
+        LOG_INFO("Operator VSetOperationNode<{}> build hash table finished, can read: {}", is_intersect, _can_read);
+    } else {
+        LOG_INFO("Operator VSetOperationNode<{}> building hash table, do not get eos",
+                 is_intersect);
     }
     return Status::OK();
 }
@@ -301,6 +316,8 @@ Status VSetOperationNode<is_intersect>::hash_table_build(RuntimeState* state) {
         }
         static_cast<void>(sink(state, &block, eos));
     }
+    LOG_INFO("VSetOperationNode<{}> buuld hash table finished, children size {}", is_intersect,
+             children_count());
 
     return Status::OK();
 }
@@ -313,6 +330,7 @@ Status VSetOperationNode<is_intersect>::process_build_block(Block& block, Runtim
     }
 
     vectorized::materialize_block_inplace(block);
+    // We will use below columns to build hash table?
     ColumnRawPtrs raw_ptrs(_child_expr_lists[0].size());
     RETURN_IF_ERROR(extract_build_column(block, raw_ptrs));
     auto st = Status::OK();
@@ -361,6 +379,7 @@ Status VSetOperationNode<is_intersect>::sink_probe(RuntimeState* state, int chil
                 << fmt::format("child with id: {} should be probed first", child_id);
     }
     auto probe_rows = block->rows();
+    LOG_INFO("VSetOperationNode dooing sink probe, child_id {}, probe_rows is {} eos: {}", child_id, probe_rows, eos);
     if (probe_rows > 0) {
         RETURN_IF_ERROR(extract_probe_column(*block, _probe_columns, child_id));
         RETURN_IF_ERROR(std::visit(
@@ -418,6 +437,9 @@ bool VSetOperationNode<is_intersect>::is_child_finished(int child_id) const {
 template <bool is_intersect>
 Status VSetOperationNode<is_intersect>::extract_build_column(Block& block,
                                                              ColumnRawPtrs& raw_ptrs) {
+    LOG_INFO("VSetOperationNode extract build column, {} cols, {} rows, child_exprs {}",
+             block.columns(), block.rows(), _child_expr_lists.size());
+    // 为什么只用第一个元素
     for (size_t i = 0; i < _child_expr_lists[0].size(); ++i) {
         int result_col_id = -1;
         RETURN_IF_ERROR(_child_expr_lists[0][i]->execute(&block, &result_col_id));
@@ -440,6 +462,8 @@ Status VSetOperationNode<is_intersect>::extract_build_column(Block& block,
         DCHECK_GE(result_col_id, 0);
         _build_col_idx.insert({result_col_id, i});
     }
+
+    LOG_INFO("After extract, _build_col_idx.size {}", _build_col_idx.size());
     return Status::OK();
 }
 

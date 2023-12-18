@@ -218,37 +218,44 @@ Status PipelineTask::execute(bool* eos) {
     SCOPED_CPU_TIMER(_task_cpu_timer);
     SCOPED_TIMER(_exec_timer);
     SCOPED_ATTACH_TASK(_state);
-    int64_t time_spent = 0;
+    int64_t time_spent_ns = 0;
 
     Defer defer {[&]() {
         if (_task_queue) {
-            _task_queue->update_statistics(this, time_spent);
+            _task_queue->update_statistics(this, time_spent_ns);
         }
     }};
     // The status must be runnable
     *eos = false;
     if (!_opened) {
         {
-            SCOPED_RAW_TIMER(&time_spent);
+            SCOPED_RAW_TIMER(&time_spent_ns);
+            LOG_INFO("Instance {} task {} doing open", print_id(instance_id()), _core_id);
             auto st = _open();
             if (st.is<ErrorCode::PIP_WAIT_FOR_RF>()) {
                 set_state(PipelineTaskState::BLOCKED_FOR_RF);
                 return Status::OK();
             } else if (st.is<ErrorCode::PIP_WAIT_FOR_SC>()) {
                 set_state(PipelineTaskState::BLOCKED_FOR_SOURCE);
+                LOG_INFO("Instance {} task {} wainting for source", print_id(instance_id()),
+                         _core_id);
                 return Status::OK();
             }
             RETURN_IF_ERROR(st);
         }
         if (has_dependency()) {
             set_state(PipelineTaskState::BLOCKED_FOR_DEPENDENCY);
+            LOG_INFO("Instance {} task {} wainting for dependency", print_id(instance_id()),
+                     _core_id);
             return Status::OK();
         }
         if (!source_can_read()) {
             set_state(PipelineTaskState::BLOCKED_FOR_SOURCE);
+            LOG_INFO("Instance {} task {} blocked for source ", print_id(instance_id()), _core_id);
             return Status::OK();
         }
         if (!sink_can_write()) {
+            LOG_INFO("Instance {} task {} blocked for sink ", print_id(instance_id()), _core_id);
             set_state(PipelineTaskState::BLOCKED_FOR_SINK);
             return Status::OK();
         }
@@ -266,12 +273,14 @@ Status PipelineTask::execute(bool* eos) {
             set_state(PipelineTaskState::BLOCKED_FOR_SINK);
             break;
         }
-        if (time_spent > THREAD_TIME_SLICE) {
+
+        if (time_spent_ns > THREAD_TIME_SLICE_NS) {
             COUNTER_UPDATE(_yield_counts, 1);
             break;
         }
+
         // TODO llj: Pipeline entity should_yield
-        SCOPED_RAW_TIMER(&time_spent);
+        SCOPED_RAW_TIMER(&time_spent_ns);
         _block->clear_column_data(_root->row_desc().num_materialized_slots());
         auto* block = _block.get();
 
@@ -280,7 +289,10 @@ Status PipelineTask::execute(bool* eos) {
             SCOPED_TIMER(_get_block_timer);
             _get_block_counter->update(1);
             RETURN_IF_ERROR(_root->get_block(_state, block, _data_state));
+            LOG_INFO("Instance {} task {} after get block got {} cols {} rows,", print_id(instance_id()),
+                     this->get_core_id(), block->columns(), block->rows());
         }
+
         *eos = _data_state == SourceState::FINISHED;
 
         if (_block->rows() != 0 || *eos) {
@@ -289,6 +301,8 @@ Status PipelineTask::execute(bool* eos) {
                 _collect_query_statistics_with_every_batch) {
                 RETURN_IF_ERROR(_collect_query_statistics());
             }
+            LOG_INFO("Instance {} task {} doing sink {} cols {} rows", print_id(instance_id()),
+                     get_core_id(), block->columns(), block->rows());
             status = _sink->sink(_state, block, _data_state);
             if (!status.is<ErrorCode::END_OF_FILE>()) {
                 RETURN_IF_ERROR(status);

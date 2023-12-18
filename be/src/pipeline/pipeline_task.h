@@ -203,7 +203,8 @@ public:
     void set_task_queue(TaskQueue* task_queue);
     TaskQueue* get_task_queue() { return _task_queue; }
 
-    static constexpr auto THREAD_TIME_SLICE = 100'000'000ULL;
+    // Unit: nanosecond, 1 second in fact.
+    static constexpr auto THREAD_TIME_SLICE_NS = 100'000'000ULL;
 
     // 1 used for update priority queue
     // note(wb) an ugly implementation, need refactor later

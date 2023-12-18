@@ -331,7 +331,8 @@ void TaskGroupTaskQueue::_update_min_tg() {
 
 // like sched_fair.c calc_delta_fair, THREAD_TIME_SLICE maybe a dynamic value.
 uint64_t TaskGroupTaskQueue::_ideal_runtime_ns(taskgroup::TGPTEntityPtr tg_entity) const {
-    return PipelineTask::THREAD_TIME_SLICE * _core_size * tg_entity->cpu_share() / _total_cpu_share;
+    return PipelineTask::THREAD_TIME_SLICE_NS * _core_size * tg_entity->cpu_share() /
+           _total_cpu_share;
 }
 
 taskgroup::TGPTEntityPtr TaskGroupTaskQueue::_next_tg_entity() {

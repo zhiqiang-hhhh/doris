@@ -259,7 +259,7 @@ Status PipelineXTask::execute(bool* eos) {
             set_state(PipelineTaskState::BLOCKED_FOR_SINK);
             break;
         }
-        if (time_spent > THREAD_TIME_SLICE) {
+        if (time_spent > THREAD_TIME_SLICE_NS) {
             COUNTER_UPDATE(_yield_counts, 1);
             break;
         }
