@@ -241,13 +241,13 @@ Status ResultFileSinkLocalState::close(RuntimeState* state, Status exec_status) 
                                 } else {
                                     SCOPED_CONSUME_MEM_TRACKER(_mem_tracker.get());
                                     status = channel->send_broadcast_block(_block_holder.get(),
-                                                                           nullptr, true);
+                                                                           true);
                                 }
                                 HANDLE_CHANNEL_STATUS(state, channel, status);
                             }
                         }
                         cur_block.clear_column_data();
-                        _serializer.get_block()->set_muatable_columns(cur_block.mutate_columns());
+                        _serializer.get_block()->set_mutable_columns(cur_block.mutate_columns());
                     }
                 }
             }

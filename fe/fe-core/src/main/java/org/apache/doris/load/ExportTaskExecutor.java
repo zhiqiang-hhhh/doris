@@ -37,7 +37,6 @@ import org.apache.doris.qe.QueryState.MysqlStateType;
 import org.apache.doris.qe.StmtExecutor;
 import org.apache.doris.scheduler.exception.JobException;
 import org.apache.doris.scheduler.executor.TransientTaskExecutor;
-import org.apache.doris.system.SystemInfoService;
 import org.apache.doris.thrift.TUniqueId;
 
 import com.google.common.collect.Lists;
@@ -144,8 +143,6 @@ public class ExportTaskExecutor implements TransientTaskExecutor {
                 exportJob.updateExportJobState(ExportJobState.CANCELLED, taskId, null,
                         ExportFailMsg.CancelType.RUN_FAIL, e.getMessage());
                 throw new JobException(e);
-            } finally {
-                stmtExecutor.addProfileToSpan();
             }
         }
         if (isCanceled.get()) {
@@ -178,7 +175,6 @@ public class ExportTaskExecutor implements TransientTaskExecutor {
         TUniqueId queryId = new TUniqueId(uuid.getMostSignificantBits(), uuid.getLeastSignificantBits());
         connectContext.setQueryId(queryId);
         connectContext.setStartTime();
-        connectContext.setCluster(SystemInfoService.DEFAULT_CLUSTER);
         return new AutoCloseConnectContext(connectContext);
     }
 

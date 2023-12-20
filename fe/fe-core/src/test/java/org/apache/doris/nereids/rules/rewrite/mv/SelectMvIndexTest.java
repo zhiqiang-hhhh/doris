@@ -166,7 +166,7 @@ class SelectMvIndexTest extends BaseMaterializedIndexSelectTest implements MemoP
         String query1 = "select name from " + EMPS_TABLE_NAME + " where " + EMPS_TABLE_NAME + ".deptno > 0;";
         createMv(createMVSql);
         ConnectContext.get().getState().setNereids(true);
-        Env.getCurrentEnv().getCurrentCatalog().getDbOrAnalysisException("default_cluster:db1")
+        Env.getCurrentEnv().getCurrentCatalog().getDbOrAnalysisException("db1")
                         .getOlapTableOrDdlException(EMPS_TABLE_NAME).getIndexIdToMeta()
                         .forEach((id, meta) -> {
                             if (meta.getWhereClause() != null) {
@@ -175,7 +175,7 @@ class SelectMvIndexTest extends BaseMaterializedIndexSelectTest implements MemoP
                         });
         testMv(query1, EMPS_MV_NAME);
         ConnectContext.get().getState().setNereids(false);
-        Env.getCurrentEnv().getCurrentCatalog().getDbOrAnalysisException("default_cluster:db1")
+        Env.getCurrentEnv().getCurrentCatalog().getDbOrAnalysisException("db1")
                 .getOlapTableOrDdlException(EMPS_TABLE_NAME).getIndexIdToMeta()
                 .forEach((id, meta) -> {
                     if (meta.getWhereClause() != null) {
@@ -875,11 +875,18 @@ class SelectMvIndexTest extends BaseMaterializedIndexSelectTest implements MemoP
         String query = "select * from (select user_id, bitmap_union_count(to_bitmap(tag_id)) x from "
                 + USER_TAG_TABLE_NAME + " group by user_id) a, (select user_name, bitmap_union_count(to_bitmap(tag_id))"
                 + "" + " y from " + USER_TAG_TABLE_NAME + " group by user_name) b where a.x=b.y;";
-        PlanChecker.from(connectContext).analyze(query).rewrite().matches(logicalJoin(
-                        logicalProject(logicalAggregate(logicalOlapScan()
-                                        .when(scan -> "user_tags_mv".equals(scan.getSelectedMaterializedIndexName())))),
-                        logicalAggregate(logicalProject(logicalOlapScan()
-                                        .when(scan -> "user_tags".equals(scan.getSelectedMaterializedIndexName()))))));
+        PlanChecker.from(connectContext)
+                .analyze(query)
+                .rewrite()
+                .matches(logicalJoin(
+                        logicalProject(
+                                logicalAggregate(
+                                        logicalOlapScan().when(scan -> "user_tags_mv".equals(
+                                                scan.getSelectedMaterializedIndexName().get())))),
+                        logicalAggregate(
+                                logicalProject(
+                                        logicalOlapScan().when(scan -> "user_tags".equals(
+                                                scan.getSelectedMaterializedIndexName().get()))))));
 
     }
 
