@@ -241,23 +241,27 @@ void TaskScheduler::_do_work(size_t index) {
         auto* fragment_ctx = task->fragment_context();
         signal::query_id_hi = fragment_ctx->get_query_id().hi;
         signal::query_id_lo = fragment_ctx->get_query_id().lo;
-        bool canceled = fragment_ctx->is_canceled();
+        bool query_canceled = fragment_ctx->is_canceled();
 
         auto state = task->get_state();
         if (state == PipelineTaskState::PENDING_FINISH) {
             DCHECK(task->is_pipelineX() || !task->is_pending_finish())
                     << "must not pending close " << task->debug_string();
-            Status exec_status = fragment_ctx->get_query_context()->exec_status();
+            Status query_status = fragment_ctx->get_query_context()->exec_status();
+            // WHAT is PENDING_FINISH 
+            // WHY query status could be cancelled or finished.
             _try_close_task(task,
-                            canceled ? PipelineTaskState::CANCELED : PipelineTaskState::FINISHED,
-                            exec_status);
+                            query_canceled ? PipelineTaskState::CANCELED : PipelineTaskState::FINISHED,
+                            query_status);
             continue;
         }
 
+        // WHy this check is not placed in the front of while
         DCHECK(state != PipelineTaskState::FINISHED && state != PipelineTaskState::CANCELED)
                 << "task already finish: " << task->debug_string();
 
-        if (canceled) {
+        if (query_canceled) {
+            // Previous task_stats could be PENDINF_FINISH
             // may change from pending FINISH，should called cancel
             // also may change form BLOCK, other task called cancel
 
@@ -400,3 +404,4 @@ void TaskScheduler::stop() {
 }
 
 } // namespace doris::pipeline
+
