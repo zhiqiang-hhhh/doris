@@ -24,6 +24,7 @@
 
 #include <ostream>
 
+#include "common/logging.h"
 #include "common/status.h"
 #include "pipeline/exec/operator.h"
 #include "pipeline/pipeline.h"
@@ -34,6 +35,7 @@
 #include "task_queue.h"
 #include "util/defer_op.h"
 #include "util/runtime_profile.h"
+#include "util/uid_util.h"
 
 namespace doris {
 class RuntimeState;
@@ -335,10 +337,15 @@ Status PipelineTask::_collect_query_statistics() {
 }
 
 Status PipelineTask::try_close(Status exec_status) {
+    // _try_close_flag data race?
+    // Seems no data race since Pipeline task will not be accessed by multi-threads.
     if (_try_close_flag) {
+        LOG_WARNING("Instance {} task {} already tried close", print_id(instance_id()), get_core_id());
         return Status::OK();
     }
     _try_close_flag = true;
+    // 
+    // exchange_sink_operator.cpp::84
     Status status1 = _sink->try_close(_state);
     Status status2 = _source->try_close(_state);
     return status1.ok() ? status2 : status1;

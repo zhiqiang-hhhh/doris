@@ -382,7 +382,7 @@ suite("test_decimalv3_overflow") {
           k1 decimalv3(34, 4),
           k2 decimalv3(34, 4)
         )
-        DISTRIBUTED BY HASH(`k1`, `k2`) BUCKETS 8
+        DISTRIBUTED BY HASH(`k1`, `k2`) BUCKETS 1
         PROPERTIES (
         "replication_num" = "1"
         );
@@ -422,7 +422,7 @@ suite("test_decimalv3_overflow") {
           k1 decimalv3(38, 1),
           k2 decimalv3(38, 12)
         )
-        DISTRIBUTED BY HASH(`k1`, `k2`) BUCKETS 8
+        DISTRIBUTED BY HASH(`k1`, `k2`) BUCKETS 1
         PROPERTIES (
         "replication_num" = "1"
         );
