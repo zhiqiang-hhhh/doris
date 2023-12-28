@@ -274,7 +274,7 @@ Status Channel<Parent>::close_internal(Status exec_status) {
     if (!_need_close) {
         return Status::OK();
     }
-    VLOG_RPC << "Channel::close_internal() instance_id=" << print_id(_fragment_instance_id)
+    LOG(INFO) << "Channel::close_internal() instance_id=" << print_id(_fragment_instance_id)
              << " dest_node=" << _dest_node_id << " #rows= "
              << ((_serializer.get_block() == nullptr) ? 0 : _serializer.get_block()->rows())
              << " receiver status: " << _receiver_status << ", exec_status: " << exec_status;
@@ -339,7 +339,7 @@ VDataStreamSender::VDataStreamSender(RuntimeState* state, ObjectPool* pool, int 
           _part_type(sink.output_partition.type),
           _dest_node_id(sink.dest_node_id),
           _transfer_large_data_by_brpc(config::transfer_large_data_by_brpc),
-          _serializer(this) {
+          _serializer(this) { // constructor of BlockSerializer will call VDataStreamSender::state()->batch_size()
     DCHECK_GT(destinations.size(), 0);
     DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED ||
            sink.output_partition.type == TPartitionType::HASH_PARTITIONED ||
