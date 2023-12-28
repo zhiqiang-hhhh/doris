@@ -291,8 +291,9 @@ Status PipelineTask::execute(bool* eos) {
             SCOPED_TIMER(_get_block_timer);
             _get_block_counter->update(1);
             RETURN_IF_ERROR(_root->get_block(_state, block, _data_state));
-            LOG_INFO("Instance {} task {} after get block got {} cols {} rows,",
-                     print_id(instance_id()), this->get_core_id(), block->columns(), block->rows());
+            LOG_INFO("Instance {} task {} after get block got {} cols {} rows, empty ? {}",
+                     print_id(instance_id()), this->get_core_id(), block->columns(), block->rows(),
+                     block->empty());
         }
 
         *eos = _data_state == SourceState::FINISHED;

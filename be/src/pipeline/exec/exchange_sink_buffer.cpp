@@ -309,6 +309,7 @@ Status ExchangeSinkBuffer<Parent>::_send_rpc(InstanceLoId id) {
             }
         }
         if (request.block) {
+            // block has been send away from this host 
             static_cast<void>(brpc_request->release_block());
         }
         q.pop();

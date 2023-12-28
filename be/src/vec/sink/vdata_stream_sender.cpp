@@ -561,6 +561,8 @@ Status VDataStreamSender::send(RuntimeState* state, Block* block, bool eos) {
                 bool serialized = false;
                 RETURN_IF_ERROR(_serializer.next_serialized_block(
                         block, block_holder->get_block(), _channels.size(), &serialized, eos));
+                // seriazlied means buffer in _serializer if big enough,
+                // new PBlock has already been generated, and buffer has been cleared.
                 if (serialized) {
                     auto cur_block = _serializer.get_block()->to_block();
                     if (!cur_block.empty()) {
@@ -735,7 +737,7 @@ Status BlockSerializer<Parent>::next_serialized_block(Block* block, PBlock* dest
 
     {
         SCOPED_CONSUME_MEM_TRACKER(_parent->mem_tracker());
-        if (rows) {
+        if (rows) { // process add_rows
             if (!rows->empty()) {
                 SCOPED_TIMER(_parent->split_block_distribute_by_channel_timer());
                 const auto* begin = rows->data();
@@ -743,7 +745,7 @@ Status BlockSerializer<Parent>::next_serialized_block(Block* block, PBlock* dest
             }
         } else if (!block->empty()) {
             SCOPED_TIMER(_parent->merge_block_timer());
-            RETURN_IF_ERROR(_mutable_block->merge(*block));
+            RETURN_IF_ERROR(_mutable_block->merge(*block)); // _mutable_block 是一个 Block 缓存，当缓存足够多的行之后，才会进行 Block -> PBlock 的转换
         }
     }
 

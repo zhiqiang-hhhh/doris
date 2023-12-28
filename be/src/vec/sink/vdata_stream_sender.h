@@ -77,6 +77,8 @@ template <typename Parent>
 class BlockSerializer {
 public:
     BlockSerializer(Parent* parent, bool is_local = true);
+    // Merge block into block buffer, do not serialization until we collect enough rows or get eos = true
+    // rows will not be nullptr when we do add_rows
     Status next_serialized_block(Block* src, PBlock* dest, int num_receivers, bool* serialized,
                                  bool eos, const std::vector<uint32_t>* rows = nullptr);
     Status serialize_block(PBlock* dest, int num_receivers = 1);
