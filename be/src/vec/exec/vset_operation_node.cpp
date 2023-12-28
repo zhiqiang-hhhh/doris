@@ -265,7 +265,8 @@ Status VSetOperationNode<is_intersect>::sink(RuntimeState* state, Block* block, 
         }
         _build_finished = true;
         _can_read = _children.size() == 1;
-        LOG_INFO("Operator VSetOperationNode<{}> build hash table finished, can read: {}", is_intersect, _can_read);
+        LOG_INFO("Operator VSetOperationNode<{}> build hash table finished, can read: {}",
+                 is_intersect, _can_read);
     } else {
         LOG_INFO("Operator VSetOperationNode<{}> building hash table, do not get eos",
                  is_intersect);
@@ -379,7 +380,8 @@ Status VSetOperationNode<is_intersect>::sink_probe(RuntimeState* state, int chil
                 << fmt::format("child with id: {} should be probed first", child_id);
     }
     auto probe_rows = block->rows();
-    LOG_INFO("VSetOperationNode dooing sink probe, child_id {}, probe_rows is {} eos: {}", child_id, probe_rows, eos);
+    LOG_INFO("VSetOperationNode dooing sink probe, child_id {}, probe_rows is {} eos: {}", child_id,
+             probe_rows, eos);
     if (probe_rows > 0) {
         RETURN_IF_ERROR(extract_probe_column(*block, _probe_columns, child_id));
         RETURN_IF_ERROR(std::visit(

@@ -275,9 +275,9 @@ Status Channel<Parent>::close_internal(Status exec_status) {
         return Status::OK();
     }
     LOG(INFO) << "Channel::close_internal() instance_id=" << print_id(_fragment_instance_id)
-             << " dest_node=" << _dest_node_id << " #rows= "
-             << ((_serializer.get_block() == nullptr) ? 0 : _serializer.get_block()->rows())
-             << " receiver status: " << _receiver_status << ", exec_status: " << exec_status;
+              << " dest_node=" << _dest_node_id << " #rows= "
+              << ((_serializer.get_block() == nullptr) ? 0 : _serializer.get_block()->rows())
+              << " receiver status: " << _receiver_status << ", exec_status: " << exec_status;
     if (is_receiver_eof()) {
         _serializer.reset_block();
         return Status::OK();
@@ -339,7 +339,8 @@ VDataStreamSender::VDataStreamSender(RuntimeState* state, ObjectPool* pool, int 
           _part_type(sink.output_partition.type),
           _dest_node_id(sink.dest_node_id),
           _transfer_large_data_by_brpc(config::transfer_large_data_by_brpc),
-          _serializer(this) { // constructor of BlockSerializer will call VDataStreamSender::state()->batch_size()
+          _serializer(
+                  this) { // constructor of BlockSerializer will call VDataStreamSender::state()->batch_size()
     DCHECK_GT(destinations.size(), 0);
     DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED ||
            sink.output_partition.type == TPartitionType::HASH_PARTITIONED ||
@@ -528,14 +529,12 @@ Status VDataStreamSender::send(RuntimeState* state, Block* block, bool eos) {
     SCOPED_TIMER(_exec_timer);
     COUNTER_UPDATE(_output_rows_counter, block->rows());
     _peak_memory_usage_counter->set(_mem_tracker->peak_consumption());
-    bool all_receiver_eof = true;
-    for (auto channel : _channels) {
-        if (!channel->is_receiver_eof()) {
-            all_receiver_eof = false;
-            break;
-        }
-    }
-    if (all_receiver_eof) {
+
+    bool all_channel_eof = std::all_of(
+            std::begin(_channels), std::end(_channels),
+            [](Channel<VDataStreamSender>* channel) { return channel->is_receiver_eof(); });
+
+    if (all_channel_eof) {
         return Status::EndOfFile("all data stream channels EOF");
     }
 
@@ -544,6 +543,7 @@ Status VDataStreamSender::send(RuntimeState* state, Block* block, bool eos) {
         // 2. send block
         // 3. rollover block
         if (_only_local_exchange) {
+            // When will we get an empty block? Why it is not send?
             if (!block->empty()) {
                 Status status;
                 for (auto channel : _channels) {

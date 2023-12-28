@@ -248,11 +248,12 @@ void TaskScheduler::_do_work(size_t index) {
             DCHECK(task->is_pipelineX() || !task->is_pending_finish())
                     << "must not pending close " << task->debug_string();
             Status query_status = fragment_ctx->get_query_context()->exec_status();
-            // WHAT is PENDING_FINISH 
+            // WHAT is PENDING_FINISH
             // WHY query status could be cancelled or finished.
-            _try_close_task(task,
-                            query_canceled ? PipelineTaskState::CANCELED : PipelineTaskState::FINISHED,
-                            query_status);
+            _try_close_task(
+                    task,
+                    query_canceled ? PipelineTaskState::CANCELED : PipelineTaskState::FINISHED,
+                    query_status);
             continue;
         }
 
@@ -404,4 +405,3 @@ void TaskScheduler::stop() {
 }
 
 } // namespace doris::pipeline
-

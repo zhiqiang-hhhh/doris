@@ -291,8 +291,8 @@ Status PipelineTask::execute(bool* eos) {
             SCOPED_TIMER(_get_block_timer);
             _get_block_counter->update(1);
             RETURN_IF_ERROR(_root->get_block(_state, block, _data_state));
-            LOG_INFO("Instance {} task {} after get block got {} cols {} rows,", print_id(instance_id()),
-                     this->get_core_id(), block->columns(), block->rows());
+            LOG_INFO("Instance {} task {} after get block got {} cols {} rows,",
+                     print_id(instance_id()), this->get_core_id(), block->columns(), block->rows());
         }
 
         *eos = _data_state == SourceState::FINISHED;
@@ -303,8 +303,9 @@ Status PipelineTask::execute(bool* eos) {
                 _collect_query_statistics_with_every_batch) {
                 RETURN_IF_ERROR(_collect_query_statistics());
             }
-            LOG_INFO("Instance {} task {} doing sink {} cols {} rows", print_id(instance_id()),
-                     get_core_id(), block->columns(), block->rows());
+            LOG_INFO("Instance {} task {} doing sink {} cols {} rows, data status: {}",
+                     print_id(instance_id()), get_core_id(), block->columns(), block->rows(),
+                     _data_state);
             status = _sink->sink(_state, block, _data_state);
             if (!status.is<ErrorCode::END_OF_FILE>()) {
                 RETURN_IF_ERROR(status);
@@ -340,11 +341,12 @@ Status PipelineTask::try_close(Status exec_status) {
     // _try_close_flag data race?
     // Seems no data race since Pipeline task will not be accessed by multi-threads.
     if (_try_close_flag) {
-        LOG_WARNING("Instance {} task {} already tried close", print_id(instance_id()), get_core_id());
+        LOG_WARNING("Instance {} task {} already tried close", print_id(instance_id()),
+                    get_core_id());
         return Status::OK();
     }
     _try_close_flag = true;
-    // 
+    //
     // exchange_sink_operator.cpp::84
     Status status1 = _sink->try_close(_state);
     Status status2 = _source->try_close(_state);
