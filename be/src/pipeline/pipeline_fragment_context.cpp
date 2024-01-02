@@ -29,6 +29,7 @@
 
 #include <chrono> // IWYU pragma: keep
 #include <map>
+#include <memory>
 #include <ostream>
 #include <typeinfo>
 #include <utility>
@@ -87,6 +88,7 @@
 #include "pipeline_task.h"
 #include "runtime/exec_env.h"
 #include "runtime/fragment_mgr.h"
+#include "runtime/query_context.h"
 #include "runtime/runtime_filter_mgr.h"
 #include "runtime/runtime_state.h"
 #include "runtime/stream_load/new_load_stream_mgr.h"
@@ -374,9 +376,10 @@ Status PipelineFragmentContext::_build_pipeline_tasks(
         RETURN_IF_ERROR(sink_operator->init(request.fragment.output_sink));
 
         RETURN_IF_ERROR(pipeline->build_operators());
-        auto task =
-                std::make_unique<PipelineTask>(pipeline, _total_tasks++, _runtime_state.get(),
-                                               sink_operator, this, pipeline->pipeline_profile());
+        auto task = std::make_unique<PipelineTask>(
+                pipeline, _total_tasks++, _runtime_state.get(), sink_operator,
+                std::dynamic_pointer_cast<PipelineFragmentContext>(shared_from_this()),
+                pipeline->pipeline_profile());
         RETURN_IF_ERROR(sink_operator->set_child(task->get_root()));
         _tasks.emplace_back(std::move(task));
         _runtime_profile->add_child(pipeline->pipeline_profile(), true, nullptr);
@@ -701,7 +704,7 @@ Status PipelineFragmentContext::_build_operators_for_set_operation_node(ExecNode
     RETURN_IF_ERROR(_build_pipelines(node->child(0), sink_pipeline));
     OperatorBuilderPtr sink_builder =
             std::make_shared<SetSinkOperatorBuilder<is_intersect>>(node->id(), node);
-    RETURN_IF_ERROR(build_pipeline->set_sink_builder(sink_builder));
+    RETURN_IF_ERROR(sink_pipeline->set_sink_builder(sink_builder));
 
     size_t child_size = node->children_count();
     for (int child_idx = 1; child_idx < child_size; ++child_idx) {

@@ -26,6 +26,7 @@
 #include "common/status.h"
 #include "exec/operator.h"
 #include "pipeline.h"
+#include "pipeline/pipeline_fragment_context.h"
 #include "runtime/task_group/task_group.h"
 #include "util/runtime_profile.h"
 #include "util/stopwatch.hpp"
@@ -34,9 +35,6 @@
 namespace doris {
 class QueryContext;
 class RuntimeState;
-namespace pipeline {
-class PipelineFragmentContext;
-} // namespace pipeline
 } // namespace doris
 
 namespace doris::pipeline {
@@ -118,13 +116,15 @@ class TaskQueue;
 class PriorityTaskQueue;
 
 // The class do the pipeline task. Minest schdule union by task scheduler
-class PipelineTask {
+class PipelineTask : public HasTaskExecutionCtx {
 public:
     PipelineTask(PipelinePtr& pipeline, uint32_t index, RuntimeState* state, OperatorPtr& sink,
-                 PipelineFragmentContext* fragment_context, RuntimeProfile* parent_profile);
+                 const std::shared_ptr<PipelineFragmentContext>& fragment_context,
+                 RuntimeProfile* parent_profile);
 
     PipelineTask(PipelinePtr& pipeline, uint32_t index, RuntimeState* state,
-                 PipelineFragmentContext* fragment_context, RuntimeProfile* parent_profile);
+                 const std::shared_ptr<PipelineFragmentContext>& fragment_context,
+                 RuntimeProfile* parent_profile);
     virtual ~PipelineTask() = default;
 
     virtual Status prepare(RuntimeState* state);
@@ -172,8 +172,6 @@ public:
     virtual bool sink_can_write() { return _sink->can_write() || _pipeline->_always_can_write; }
 
     virtual void finalize() {}
-
-    PipelineFragmentContext* fragment_context() { return _fragment_context; }
 
     QueryContext* query_context();
 
@@ -287,7 +285,6 @@ protected:
     PipelineTaskState _cur_state;
     SourceState _data_state;
     std::unique_ptr<doris::vectorized::Block> _block;
-    PipelineFragmentContext* _fragment_context = nullptr;
     TaskQueue* _task_queue = nullptr;
 
     // used for priority queue

@@ -22,6 +22,7 @@
 #include <glog/logging.h>
 #include <stddef.h>
 
+#include <memory>
 #include <ostream>
 
 #include "common/status.h"
@@ -30,6 +31,7 @@
 #include "pipeline_fragment_context.h"
 #include "runtime/descriptors.h"
 #include "runtime/query_context.h"
+#include "runtime/task_execution_context.h"
 #include "runtime/thread_context.h"
 #include "task_queue.h"
 #include "util/defer_op.h"
@@ -42,16 +44,17 @@ class RuntimeState;
 namespace doris::pipeline {
 
 PipelineTask::PipelineTask(PipelinePtr& pipeline, uint32_t index, RuntimeState* state,
-                           OperatorPtr& sink, PipelineFragmentContext* fragment_context,
+                           OperatorPtr& sink,
+                           const std::shared_ptr<PipelineFragmentContext>& fragment_context,
                            RuntimeProfile* parent_profile)
-        : _index(index),
+        : HasTaskExecutionCtx(fragment_context),
+          _index(index),
           _pipeline(pipeline),
           _prepared(false),
           _opened(false),
           _state(state),
           _cur_state(PipelineTaskState::NOT_READY),
           _data_state(SourceState::DEPEND_ON_SOURCE),
-          _fragment_context(fragment_context),
           _parent_profile(parent_profile),
           _operators(pipeline->_operators),
           _source(_operators.front()),
@@ -66,16 +69,16 @@ PipelineTask::PipelineTask(PipelinePtr& pipeline, uint32_t index, RuntimeState* 
 }
 
 PipelineTask::PipelineTask(PipelinePtr& pipeline, uint32_t index, RuntimeState* state,
-                           PipelineFragmentContext* fragment_context,
+                           const std::shared_ptr<PipelineFragmentContext>& fragment_context,
                            RuntimeProfile* parent_profile)
-        : _index(index),
+        : HasTaskExecutionCtx(fragment_context),
+          _index(index),
           _pipeline(pipeline),
           _prepared(false),
           _opened(false),
           _state(state),
           _cur_state(PipelineTaskState::NOT_READY),
           _data_state(SourceState::DEPEND_ON_SOURCE),
-          _fragment_context(fragment_context),
           _parent_profile(parent_profile),
           _operators({}),
           _source(nullptr),
@@ -175,10 +178,17 @@ Status PipelineTask::prepare(RuntimeState* state) {
 }
 
 bool PipelineTask::has_dependency() {
+    auto context = task_exec_ctx<PipelineFragmentContext>();
+    if (context == nullptr) {
+        LOG_ERROR("Context of instance {} already destoried before pipeline task {} get it",
+                  print_id(instance_id()), get_core_id());
+        return false;
+    }
     if (_dependency_finish) {
         return false;
     }
-    if (_fragment_context->is_canceled()) {
+
+    if (context->is_canceled()) {
         _dependency_finish = true;
         return false;
     }
@@ -219,6 +229,12 @@ Status PipelineTask::execute(bool* eos) {
     SCOPED_TIMER(_exec_timer);
     SCOPED_ATTACH_TASK(_state);
     int64_t time_spent = 0;
+    auto fragment_instance_context = task_exec_ctx<PipelineFragmentContext>();
+    if (fragment_instance_context == nullptr) {
+        LOG_ERROR("Context of instance {} already destoried before pipeline task {} get it",
+                  print_id(instance_id()), get_core_id());
+        return Status::RuntimeError("instance destoried");
+    }
 
     Defer defer {[&]() {
         if (_task_queue) {
@@ -257,7 +273,7 @@ Status PipelineTask::execute(bool* eos) {
     auto status = Status::OK();
 
     this->set_begin_execute_time();
-    while (!_fragment_context->is_canceled()) {
+    while (!fragment_instance_context->is_canceled()) {
         if (_data_state != SourceState::MORE_DATA && !source_can_read()) {
             set_state(PipelineTaskState::BLOCKED_FOR_SOURCE);
             break;
@@ -356,10 +372,6 @@ Status PipelineTask::close(Status exec_status) {
     return s;
 }
 
-QueryContext* PipelineTask::query_context() {
-    return _fragment_context->get_query_ctx();
-}
-
 // The FSM see PipelineTaskState's comment
 void PipelineTask::set_state(PipelineTaskState state) {
     DCHECK(_cur_state != PipelineTaskState::FINISHED);
@@ -405,11 +417,18 @@ void PipelineTask::set_state(PipelineTaskState state) {
 }
 
 std::string PipelineTask::debug_string() {
+    auto fragment_instance_context = task_exec_ctx<PipelineFragmentContext>();
+    if (fragment_instance_context == nullptr) {
+        LOG_ERROR("Context of instance {} already destoried before pipeline task {} get it",
+                  print_id(instance_id()), get_core_id());
+        return "";
+    }
+
     fmt::memory_buffer debug_string_buffer;
 
     fmt::format_to(debug_string_buffer, "QueryId: {}\n", print_id(query_context()->query_id()));
     fmt::format_to(debug_string_buffer, "InstanceId: {}\n",
-                   print_id(fragment_context()->get_fragment_instance_id()));
+                   print_id(fragment_instance_context->get_fragment_instance_id()));
 
     fmt::format_to(debug_string_buffer, "RuntimeUsage: {}\n",
                    PrettyPrinter::print(get_runtime_ns(), TUnit::TIME_NS));
@@ -441,7 +460,13 @@ std::string PipelineTask::debug_string() {
 }
 
 taskgroup::TaskGroupPipelineTaskEntity* PipelineTask::get_task_group_entity() const {
-    return _fragment_context->get_task_group_entity();
+    auto fragment_instance_context = task_exec_ctx<PipelineFragmentContext>();
+    if (fragment_instance_context == nullptr) {
+        LOG_ERROR("instance destoried");
+        return nullptr;
+    }
+
+    return fragment_instance_context->get_task_group_entity();
 }
 
 } // namespace doris::pipeline

@@ -33,7 +33,6 @@
 
 #include "common/status.h"
 #include "pipeline/pipeline.h"
-#include "pipeline/pipeline_task.h"
 #include "runtime/query_context.h"
 #include "runtime/runtime_state.h"
 #include "runtime/task_execution_context.h"
@@ -50,6 +49,7 @@ class TDataSink;
 class TPipelineFragmentParams;
 
 namespace pipeline {
+class PipelineTask;
 
 class PipelineFragmentContext : public TaskExecutionContext {
 public:

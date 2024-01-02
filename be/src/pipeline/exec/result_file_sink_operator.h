@@ -41,6 +41,10 @@ public:
     ResultFileSinkOperator(OperatorBuilderBase* operator_builder, DataSink* sink);
 
     bool can_write() override { return true; }
+
+    // WIP: We will rename this method to something like finish/finalize after all DataSinkOperators are refactored.
+    Status try_close(RuntimeState* state) override;
+    Status close(RuntimeState* state) override;
 };
 
 class ResultFileSinkOperatorX;

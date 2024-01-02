@@ -236,9 +236,18 @@ void TaskScheduler::_do_work(size_t index) {
             static_cast<void>(_task_queue->push_back(task, index));
             continue;
         }
+
+        auto fragment_ctx = task->task_exec_ctx<PipelineFragmentContext>();
+        if (fragment_ctx == nullptr) {
+            LOG_ERROR(
+                    "Execution context of pipeline task(instance {} core id {}) has already been "
+                    "destoried",
+                    print_id(task->instance_id()), task->get_core_id());
+            continue;
+        }
+
         task->set_running(true);
         task->set_task_queue(_task_queue.get());
-        auto* fragment_ctx = task->fragment_context();
         signal::query_id_hi = fragment_ctx->get_query_id().hi;
         signal::query_id_lo = fragment_ctx->get_query_id().lo;
         bool canceled = fragment_ctx->is_canceled();
@@ -291,8 +300,9 @@ void TaskScheduler::_do_work(size_t index) {
             task->set_eos_time();
             LOG(WARNING) << fmt::format(
                     "Pipeline task failed. query_id: {} reason: {}",
-                    PrintInstanceStandardInfo(task->query_context()->query_id(),
-                                              task->fragment_context()->get_fragment_instance_id()),
+                    PrintInstanceStandardInfo(
+                            fragment_ctx->get_query_ctx()->query_id(),
+                            fragment_ctx->get_fragment_instance_id()),
                     status.msg());
             // Print detail informations below when you debugging here.
             //
@@ -311,12 +321,13 @@ void TaskScheduler::_do_work(size_t index) {
             //  and find_p_dependency
             VLOG_DEBUG << fmt::format(
                     "Try close task: {}, fragment_ctx->is_canceled(): {}",
-                    PrintInstanceStandardInfo(task->query_context()->query_id(),
-                                              task->fragment_context()->get_fragment_instance_id()),
+                    PrintInstanceStandardInfo(
+                            fragment_ctx->get_query_ctx()->query_id(),
+                            fragment_ctx->get_fragment_instance_id()),
                     fragment_ctx->is_canceled());
             _try_close_task(task,
                             fragment_ctx->is_canceled() ? PipelineTaskState::CANCELED
-                                                        : PipelineTaskState::FINISHED,
+                                                                     : PipelineTaskState::FINISHED,
                             status);
             continue;
         }
@@ -343,9 +354,15 @@ void TaskScheduler::_do_work(size_t index) {
 
 void TaskScheduler::_try_close_task(PipelineTask* task, PipelineTaskState state,
                                     Status exec_status) {
-    // close_a_pipeline may delete fragment context and will core in some defer
-    // code, because the defer code will access fragment context it self.
-    auto lock_for_context = task->fragment_context()->shared_from_this();
+    auto pipeline_fragment_context = task->task_exec_ctx<PipelineFragmentContext>();
+    if (pipeline_fragment_context == nullptr) {
+        LOG_ERROR(
+                "Execution context of pipeline task(instance {} core id {}) has already been "
+                "destoried",
+                print_id(task->instance_id()), task->get_core_id());
+        return;
+    }
+
     auto status = task->try_close(exec_status);
     auto cancel = [&]() {
         task->query_context()->cancel(true, status.to_string(),
@@ -379,7 +396,7 @@ void TaskScheduler::_try_close_task(PipelineTask* task, PipelineTaskState state,
     task->set_close_pipeline_time();
     task->finalize();
     task->set_running(false);
-    task->fragment_context()->close_a_pipeline();
+    pipeline_fragment_context->close_a_pipeline();
 }
 
 void TaskScheduler::stop() {

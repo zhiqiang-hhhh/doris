@@ -46,7 +46,10 @@ struct HasTaskExecutionCtx {
     HasTaskExecutionCtx(T* state) : task_exec_ctx_(state->get_task_execution_context()) {}
 
 public:
-    inline TaskExecutionContextSPtr task_exec_ctx() const { return task_exec_ctx_.lock(); }
+    template <typename ContextType = TaskExecutionContext>
+    inline std::shared_ptr<ContextType> task_exec_ctx() const {
+        return std::dynamic_pointer_cast<ContextType>(task_exec_ctx_.lock());
+    }
 
 private:
     Weak task_exec_ctx_;

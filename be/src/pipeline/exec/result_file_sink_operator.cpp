@@ -24,6 +24,7 @@
 #include "pipeline/exec/operator.h"
 #include "runtime/buffer_control_block.h"
 #include "runtime/result_buffer_mgr.h"
+#include "runtime/runtime_state.h"
 #include "vec/sink/vdata_stream_sender.h"
 #include "vec/sink/vresult_file_sink.h"
 
@@ -43,6 +44,16 @@ OperatorPtr ResultFileSinkOperatorBuilder::build_operator() {
 ResultFileSinkOperator::ResultFileSinkOperator(OperatorBuilderBase* operator_builder,
                                                DataSink* sink)
         : DataSinkOperator(operator_builder, sink) {};
+
+Status ResultFileSinkOperator::try_close(RuntimeState* state) {
+    return Status::OK();
+}
+
+Status ResultFileSinkOperator::close(RuntimeState* state) {
+    // How do we make sure state is not a wild pointer?
+    auto holder_of_instance_context = state->get_task_execution_context().lock();
+    return Status::OK();
+}
 
 ResultFileSinkLocalState::ResultFileSinkLocalState(DataSinkOperatorXBase* parent,
                                                    RuntimeState* state)
