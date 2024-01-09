@@ -270,22 +270,6 @@ Status IndexChannel::check_tablet_filtered_rows_consistency() {
     return Status::OK();
 }
 
-static Status none_of(std::initializer_list<bool> vars) {
-    bool none = std::none_of(vars.begin(), vars.end(), [](bool var) { return var; });
-    Status st = Status::OK();
-    if (!none) {
-        std::string vars_str;
-        std::for_each(vars.begin(), vars.end(),
-                      [&vars_str](bool var) -> void { vars_str += (var ? "1/" : "0/"); });
-        if (!vars_str.empty()) {
-            vars_str.pop_back(); // 0/1/0/ -> 0/1/0
-        }
-        st = Status::Uninitialized(vars_str);
-    }
-
-    return st;
-}
-
 VNodeChannel::VNodeChannel(VTabletWriter* parent, IndexChannel* index_channel, int64_t node_id,
                            bool is_incremental)
         : _parent(parent),
@@ -461,16 +445,15 @@ Status VNodeChannel::add_block(vectorized::Block* block, const Payload* payload,
     if (payload->second.empty()) {
         return Status::OK();
     }
+
+    if (_cancelled) {
+        std::lock_guard<std::mutex> l(_cancel_msg_lock);
+        return Status::Error<ErrorCode::INTERNAL_ERROR, false>("add row failed. {}", _cancel_msg);
+    }
+
     // If add_block() when _eos_is_produced==true, there must be sth wrong, we can only mark this channel as failed.
-    auto st = none_of({_cancelled, _eos_is_produced});
-    if (!st.ok()) {
-        if (_cancelled) {
-            std::lock_guard<doris::SpinLock> l(_cancel_msg_lock);
-            return Status::Error<ErrorCode::INTERNAL_ERROR, false>("add row failed. {}",
-                                                                   _cancel_msg);
-        } else {
-            return std::move(st.prepend("already stopped, can't add row. cancelled/eos: "));
-        }
+    if (_eos_is_produced) {
+        return Status::Error<ErrorCode::INTERNAL_ERROR, false>("already eos. can not add row.");
     }
 
     // We use OlapTableSink mem_tracker which has the same ancestor of _plan node,
@@ -569,9 +552,11 @@ int VNodeChannel::try_send_and_fetch_status(RuntimeState* state,
 }
 
 void VNodeChannel::_cancel_with_msg(const std::string& msg) {
-    LOG(WARNING) << "cancel node channel " << channel_info() << ", error message: " << msg;
     {
-        std::lock_guard<doris::SpinLock> l(_cancel_msg_lock);
+        std::lock_guard<std::mutex> l(_cancel_msg_lock);
+        LOG_WARNING("Cancel node channel {}, error message {}, existing cancel msg {}",
+                    channel_info(), msg, _cancel_msg);
+
         if (_cancel_msg.empty()) {
             _cancel_msg = msg;
         }
@@ -869,16 +854,14 @@ Status VNodeChannel::close_wait(RuntimeState* state) {
         _is_closed = true;
     }};
 
-    auto st = none_of({_cancelled, !_eos_is_produced});
-    if (!st.ok()) {
-        if (_cancelled) {
-            std::lock_guard<doris::SpinLock> l(_cancel_msg_lock);
-            return Status::Error<ErrorCode::INTERNAL_ERROR, false>("wait close failed. {}",
-                                                                   _cancel_msg);
-        } else {
-            return std::move(
-                    st.prepend("already stopped, skip waiting for close. cancelled/!eos: "));
-        }
+    if (_cancelled) {
+        std::lock_guard<std::mutex> l(_cancel_msg_lock);
+        return Status::Error<ErrorCode::INTERNAL_ERROR, false>("wait close failed. {}",
+                                                               _cancel_msg);
+    }
+
+    if (!_eos_is_produced) {
+        return Status::Error<ErrorCode::INTERNAL_ERROR, false>("eos not produced, skip close wait");
     }
 
     // waiting for finished, it may take a long time, so we couldn't set a timeout
@@ -914,12 +897,19 @@ void VNodeChannel::_close_check() {
 }
 
 void VNodeChannel::mark_close() {
-    auto st = none_of({_cancelled, _eos_is_produced});
-    if (!st.ok()) {
+    if (_cancelled) {
+        std::lock_guard<std::mutex> l(_cancel_msg_lock);
+        LOG_ERROR("mark close failed, already cancelled, cancel msg: {}", _cancel_msg);
+        return;
+    }
+
+    if (_eos_is_produced) {
+        LOG_ERROR("mark close failed, eos already produced before mark close");
         return;
     }
 
     _cur_add_block_request->set_eos(true);
+
     {
         std::lock_guard<std::mutex> l(_pending_batches_lock);
         if (!_cur_mutable_block) [[unlikely]] {
@@ -1050,7 +1040,8 @@ Status VTabletWriter::open(doris::RuntimeState* state, doris::RuntimeProfile* pr
             ThreadPool::ExecutionMode::CONCURRENT, send_batch_parallelism);
 
     // start to send batch continually. this must be called after _init
-    if (bthread_start_background(&_sender_thread, nullptr, periodic_send_batch, (void*)this) != 0) {
+    if (bthread_start_background(&_sender_bthread, nullptr, periodic_send_batch, (void*)this) !=
+        0) {
         return Status::Error<ErrorCode::INTERNAL_ERROR>("bthread_start_backgroud failed");
     }
     return Status::OK();
@@ -1546,8 +1537,8 @@ Status VTabletWriter::close(Status exec_status) {
 
     // Sender join() must put after node channels mark_close/cancel.
     // But there is no specific sequence required between sender join() & close_wait().
-    if (_sender_thread) {
-        bthread_join(_sender_thread, nullptr);
+    if (_sender_bthread) {
+        bthread_join(_sender_bthread, nullptr);
         // We have to wait all task in _send_batch_thread_pool_token finished,
         // because it is difficult to handle concurrent problem if we just
         // shutdown it.
@@ -1665,14 +1656,17 @@ Status VTabletWriter::append_block(doris::vectorized::Block& input_block) {
 
     // Add block to node channel
     for (size_t i = 0; i < _channels.size(); i++) {
-        for (const auto& entry : channel_to_payload[i]) {
+        std::unordered_map<VNodeChannel*, Payload>& channel_to_payload_entry =
+                channel_to_payload[i];
+        for (auto& pair : channel_to_payload_entry) {
             // if this node channel is already failed, this add_row will be skipped
-            auto st = entry.first->add_block(
-                    block.get(), &entry.second, // entry.second is a [row -> tablet] mapping
-                    // if it is load single tablet, then append this whole block
-                    load_block_to_single_tablet);
+            VNodeChannel* node_channel_ptr = pair.first;
+            const Payload& payload = pair.second; //   [row -> tablet] mapping
+            // if it is load single tablet, then append this whole block
+            auto st =
+                    node_channel_ptr->add_block(block.get(), &payload, load_block_to_single_tablet);
             if (!st.ok()) {
-                _channels[i]->mark_as_failed(entry.first, st.to_string());
+                _channels[i]->mark_as_failed(node_channel_ptr, st.to_string());
             }
         }
     }

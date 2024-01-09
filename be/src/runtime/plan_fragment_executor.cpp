@@ -592,7 +592,8 @@ void PlanFragmentExecutor::stop_report_thread() {
 void PlanFragmentExecutor::cancel(const PPlanFragmentCancelReason& reason, const std::string& msg) {
     std::lock_guard<std::mutex> l(_status_lock);
     LOG_INFO("PlanFragmentExecutor::cancel {} reason {} error msg {}",
-             PrintInstanceStandardInfo(query_id(), fragment_instance_id()), reason, msg);
+             PrintInstanceStandardInfo(query_id(), fragment_instance_id()),
+             PPlanFragmentCancelReason_Name(reason), msg);
 
     // NOTE: Not need to check if already cancelled.
     // Bug scenario: test_array_map_function.groovy:

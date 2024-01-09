@@ -267,7 +267,7 @@ public:
         std::stringstream ss;
         ss << "close wait failed coz rpc error";
         {
-            std::lock_guard<doris::SpinLock> l(_cancel_msg_lock);
+            std::lock_guard<std::mutex> l(_cancel_msg_lock);
             if (!_cancel_msg.empty()) {
                 ss << ". " << _cancel_msg;
             }
@@ -345,7 +345,7 @@ protected:
 
     // user cancel or get some errors
     std::atomic<bool> _cancelled {false};
-    doris::SpinLock _cancel_msg_lock;
+    std::mutex _cancel_msg_lock;
     std::string _cancel_msg;
 
     // send finished means the consumer thread which send the rpc can exit
@@ -354,7 +354,7 @@ protected:
     // add batches finished means the last rpc has be response, used to check whether this channel can be closed
     std::atomic<bool> _add_batches_finished {false}; // reuse for vectorized
 
-    bool _eos_is_produced {false}; // only for restricting producer behaviors
+    std::atomic<bool> _eos_is_produced {false}; // only for restricting producer behaviors
 
     std::unique_ptr<RowDescriptor> _row_desc;
     int _batch_size = 0;
@@ -565,7 +565,7 @@ private:
 
     ObjectPool* _pool = nullptr;
 
-    bthread_t _sender_thread = 0;
+    bthread_t _sender_bthread = 0;
 
     // unique load id
     PUniqueId _load_id;
@@ -645,7 +645,7 @@ private:
     // Save the status of try_close() and close() method
     Status _close_status;
     // if we called try_close(), for auto partition the periodic send thread should stop if it's still waiting for node channels first-time open.
-    bool _try_close = false;
+    std::atomic_bool _try_close {false};
     // for non-pipeline, if close() did something, close_wait() should wait it.
     bool _close_wait = false;
     bool _inited = false;
