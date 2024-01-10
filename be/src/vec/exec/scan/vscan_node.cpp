@@ -360,6 +360,7 @@ Status VScanNode::try_close(RuntimeState* state) {
 Status VScanNode::_normalize_conjuncts() {
     // The conjuncts is always on output tuple, so use _output_tuple_desc;
     std::vector<SlotDescriptor*> slots = _output_tuple_desc->slots();
+    LOG_INFO("Output tuple id {}", _output_tuple_id);
 
     for (int slot_idx = 0; slot_idx < slots.size(); ++slot_idx) {
         _colname_to_slot_id[slots[slot_idx]->col_name()] = slots[slot_idx]->id();
@@ -371,6 +372,10 @@ Status VScanNode::_normalize_conjuncts() {
                 continue;
             }
         }
+
+        LOG_INFO("slots {} id {} col_name {} type {}", slot_idx, slots[slot_idx]->id(),
+                 slots[slot_idx]->col_name(), slots[slot_idx]->type().debug_string());
+
         switch (type) {
 #define M(NAME)                                                                              \
     case TYPE_##NAME: {                                                                      \
