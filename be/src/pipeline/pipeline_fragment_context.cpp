@@ -714,7 +714,6 @@ Status PipelineFragmentContext::_build_operators_for_set_operation_node(ExecNode
     return cur_pipe->add_operator(source_builder);
 }
 
-
 Status PipelineFragmentContext::submit() {
     if (_submitted) {
         return Status::InternalError("submitted");
