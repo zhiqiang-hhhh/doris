@@ -48,6 +48,7 @@
 #include "vec/exprs/vexpr.h"
 #include "vec/exprs/vexpr_context.h"
 #include "vec/runtime/vdatetime_value.h"
+#include "util/int8_to_string.h"
 
 namespace doris {
 namespace vectorized {

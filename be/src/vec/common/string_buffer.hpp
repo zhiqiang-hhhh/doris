@@ -18,10 +18,13 @@
 #pragma once
 #include <fmt/format.h>
 
+#include <cstdint>
 #include <cstring>
+#include <type_traits>
 
 #include "vec/columns/column_string.h"
 #include "vec/common/string_ref.h"
+#include "vec/core/types.h"
 
 namespace doris::vectorized {
 
@@ -51,7 +54,12 @@ public:
     template <typename T>
     void write_number(T data) {
         fmt::memory_buffer buffer;
-        fmt::format_to(buffer, "{}", data);
+        if constexpr (std::is_same_v<T, Int8>) {
+            fmt::format_to(buffer, "{}", (int8_t)data);
+        } else {
+            fmt::format_to(buffer, "{}", data);
+        }
+        
         write(buffer.data(), buffer.size());
     }
 

@@ -1033,6 +1033,13 @@ struct NearestFieldTypeImpl<unsigned char> {
     using Type = Int64;
 };
 
+#if defined (__clang__) && defined (USE_LIBCPP)
+template <>
+struct NearestFieldTypeImpl<Int8> {
+    using Type = Int64;
+};
+#endif
+
 template <>
 struct NearestFieldTypeImpl<UInt16> {
     using Type = UInt64;

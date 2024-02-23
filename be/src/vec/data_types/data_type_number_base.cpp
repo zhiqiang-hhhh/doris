@@ -40,6 +40,7 @@
 #include "vec/common/string_buffer.hpp"
 #include "vec/io/io_helper.h"
 #include "vec/io/reader_buffer.h"
+#include "util/int8_to_string.h"
 
 namespace doris::vectorized {
 

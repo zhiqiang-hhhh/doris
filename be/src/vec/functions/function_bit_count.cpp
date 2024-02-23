@@ -41,9 +41,11 @@ struct BitCountImpl {
     using ResultType = std::conditional_t<sizeof(T) * 8 >= 128, Int16, Int8>;
 
     static inline ResultType apply(T a) {
+        if constexpr (std::is_same_v<T, Int8>) {
+            return std::popcount((uint8_t)a);
+        }
         if constexpr (std::is_same_v<T, Int128> || std::is_same_v<T, Int64> ||
-                      std::is_same_v<T, Int32> || std::is_same_v<T, Int16> ||
-                      std::is_same_v<T, Int8>) {
+                      std::is_same_v<T, Int32> || std::is_same_v<T, Int16>) {
             return std::popcount(static_cast<std::make_unsigned_t<T>>(a));
         } else {
             throw Exception(ErrorCode::INVALID_ARGUMENT,

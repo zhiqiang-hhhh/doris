@@ -19,6 +19,7 @@
 
 #include <fmt/format.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 
 #include <filesystem>
 

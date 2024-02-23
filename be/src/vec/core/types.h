@@ -111,7 +111,15 @@ using UInt16 = uint16_t;
 using UInt32 = uint32_t;
 using UInt64 = uint64_t;
 
+#if defined (__clang__) && defined (USE_LIBCPP)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wbit-int-extension"
+using Int8 = signed _BitInt(8);
+#pragma clang diagnostic pop
+#else
 using Int8 = int8_t;
+#endif
+
 using Int16 = int16_t;
 using Int32 = int32_t;
 using Int64 = int64_t;
@@ -522,6 +530,7 @@ struct Decimal {
     Decimal(Decimal<T>&&) = default;
     Decimal(const Decimal<T>&) = default;
 
+    explicit(IsInt256) Decimal(Int8 value) noexcept : value(value) {}
     explicit(IsInt256) Decimal(Int32 value) noexcept : value(value) {}
     explicit(IsInt256) Decimal(Int64 value) noexcept : value(value) {}
     explicit(IsInt256) Decimal(Int128 value) noexcept : value(value) {}
@@ -668,6 +677,7 @@ struct Decimal128V3 : public Decimal<Int128> {
 #define DECLARE_NUMERIC_CTOR(TYPE) \
     Decimal128V3(const TYPE& value_) : Decimal<Int128>(value_) {}
 
+    DECLARE_NUMERIC_CTOR(Int8)
     DECLARE_NUMERIC_CTOR(wide::Int256)
     DECLARE_NUMERIC_CTOR(Int128)
     DECLARE_NUMERIC_CTOR(IPv6)
@@ -978,3 +988,14 @@ constexpr bool typeindex_is_int(doris::vectorized::TypeIndex index) {
     }
     }
 }
+
+namespace std {
+template <>
+struct hash<doris::vectorized::Int8> /// NOLINT (cert-dcl58-cpp)
+{
+    size_t operator()(const doris::vectorized::Int8 x) const {
+        return std::hash<int8_t>()(int8_t {x});
+    }
+};
+
+}  // namespace std
