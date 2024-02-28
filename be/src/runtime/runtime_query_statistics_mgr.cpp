@@ -43,6 +43,15 @@ void RuntimeQueryStatiticsMgr::register_query_statistics(std::string query_id,
     _query_statistics_ctx_map.at(query_id)->_qs_list.push_back(qs_ptr);
 }
 
+void RuntimeQueryStatiticsMgr::register_query_profile(const std::string& query_id,
+                                                      const QueryProfilePtr profile) {
+    std::lock_guard<std::shared_mutex> write_lock(_qs_ctx_map_lock);
+    
+    if (_query_profile_map.find(query_id) == _query_profile_map.end()) {
+        _query_profile_map[query_id] = profile;
+    }
+}
+
 void RuntimeQueryStatiticsMgr::report_runtime_query_statistics() {
     int64_t be_id = ExecEnv::GetInstance()->master_info()->backend_id;
     // 1 get query statistics map

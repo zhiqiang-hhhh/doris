@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <gen_cpp/RuntimeProfile_types.h>
 #include <gen_cpp/Types_types.h>
 #include <gen_cpp/types.pb.h>
 
@@ -137,6 +138,16 @@ public:
     virtual std::string debug_string();
 
     uint64_t create_time() const { return _create_time; }
+
+    std::shared_ptr<TRuntimeProfileTree> collect_profile() const {
+        if (!_runtime_profile) {
+            return nullptr;
+        }
+
+        std::shared_ptr<TRuntimeProfileTree> res = std::make_shared<TRuntimeProfileTree>();
+        _runtime_profile->to_thrift(res.get());
+        return res;
+    }
 
 protected:
     Status _create_sink(int sender_id, const TDataSink& t_data_sink, RuntimeState* state);

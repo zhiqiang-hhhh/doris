@@ -260,16 +260,16 @@ void FragmentMgr::report_status_callback(const ReportStatusRequest& req) {
                 }
             }
         } else {
-            if (req.profile != nullptr) {
-                req.profile->to_thrift(&params.profile);
-                if (req.load_channel_profile) {
-                    req.load_channel_profile->to_thrift(&params.loadChannelProfile);
-                }
-                params.__isset.profile = true;
-                params.__isset.loadChannelProfile = true;
-            } else {
-                params.__isset.profile = false;
-            }
+            // if (req.profile != nullptr) {
+            //     req.profile->to_thrift(&params.profile);
+            //     if (req.load_channel_profile) {
+            //         req.load_channel_profile->to_thrift(&params.loadChannelProfile);
+            //     }
+            //     params.__isset.profile = true;
+            //     params.__isset.loadChannelProfile = true;
+            // } else {
+            params.__isset.profile = false;
+            // }
         }
 
         if (!req.runtime_state->output_files().empty()) {

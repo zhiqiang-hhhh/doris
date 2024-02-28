@@ -505,7 +505,6 @@ void PlanFragmentExecutor::send_report(bool done) {
             false,
             status,
             {},
-            _runtime_state->enable_profile() ? _runtime_state->runtime_profile() : nullptr,
             _runtime_state->enable_profile() ? _runtime_state->load_channel_profile() : nullptr,
             done || !status.ok(),
             _query_ctx->coord_addr,

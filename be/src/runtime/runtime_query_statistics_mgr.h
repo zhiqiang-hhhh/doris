@@ -17,9 +17,13 @@
 
 #pragma once
 
+#include <gen_cpp/RuntimeProfile_types.h>
+
+#include <memory>
 #include <shared_mutex>
 #include <string>
 
+#include "profile/profile.h"
 #include "runtime/query_statistics.h"
 #include "runtime/workload_management/workload_condition.h"
 #include "util/time.h"
@@ -53,8 +57,12 @@ public:
 
     void register_query_statistics(std::string query_id, std::shared_ptr<QueryStatistics> qs_ptr,
                                    TNetworkAddress fe_addr);
+    // register query profile so that profile info will be reported to FE
+    void register_query_profile(const std::string& query_id, const QueryProfilePtr profile);
 
     void report_runtime_query_statistics();
+
+    void report_query_profiles();
 
     void set_query_finished(std::string query_id);
 
@@ -69,6 +77,9 @@ public:
 private:
     std::shared_mutex _qs_ctx_map_lock;
     std::map<std::string, std::unique_ptr<QueryStatisticsCtx>> _query_statistics_ctx_map;
+
+    std::shared_mutex _query_profile_map_lock;
+    std::map<std::string, QueryProfilePtr> _query_profile_map;
 };
 
 } // namespace doris

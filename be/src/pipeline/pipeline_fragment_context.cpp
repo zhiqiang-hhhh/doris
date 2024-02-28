@@ -947,7 +947,7 @@ Status PipelineFragmentContext::send_report(bool done) {
             {false,
              exec_status,
              {},
-             _runtime_state->enable_profile() ? _runtime_state->runtime_profile() : nullptr,
+             //  _runtime_state->enable_profile() ? _runtime_state->runtime_profile() : nullptr,
              _runtime_state->enable_profile() ? _runtime_state->load_channel_profile() : nullptr,
              done || !exec_status.ok(),
              _query_ctx->coord_addr,

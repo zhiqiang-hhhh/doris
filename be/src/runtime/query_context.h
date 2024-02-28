@@ -18,6 +18,7 @@
 #pragma once
 
 #include <gen_cpp/PaloInternalService_types.h>
+#include <gen_cpp/RuntimeProfile_types.h>
 #include <gen_cpp/Types_types.h>
 
 #include <atomic>
@@ -27,6 +28,7 @@
 #include "common/config.h"
 #include "common/factory_creator.h"
 #include "common/object_pool.h"
+#include "profile/profile.h"
 #include "runtime/exec_env.h"
 #include "runtime/memory/mem_tracker_limiter.h"
 #include "runtime/query_statistics.h"
@@ -48,7 +50,7 @@ struct ReportStatusRequest {
     bool is_pipeline_x;
     const Status status;
     std::vector<RuntimeState*> runtime_states;
-    RuntimeProfile* profile = nullptr;
+    // RuntimeProfile* profile = nullptr;
     RuntimeProfile* load_channel_profile = nullptr;
     bool done;
     TNetworkAddress coord_addr;
@@ -210,6 +212,8 @@ public:
 
     void register_cpu_statistics();
 
+    void register_query_profile();
+
     std::shared_ptr<QueryStatistics> get_cpu_statistics() { return _cpu_statistics; }
 
     doris::pipeline::TaskScheduler* get_pipe_exec_scheduler();
@@ -222,6 +226,8 @@ public:
             std::shared_ptr<RuntimeFilterMergeControllerEntity>& handler) {
         _merge_controller_handler = handler;
     }
+
+    QueryProfilePtr collect_profile();
 
     DescriptorTbl* desc_tbl = nullptr;
     bool set_rsc_info = false;

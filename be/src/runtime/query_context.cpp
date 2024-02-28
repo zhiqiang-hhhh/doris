@@ -22,6 +22,7 @@
 
 #include "pipeline/pipeline_fragment_context.h"
 #include "pipeline/pipeline_x/dependency.h"
+#include "runtime/exec_env.h"
 #include "runtime/runtime_query_statistics_mgr.h"
 #include "runtime/task_group/task_group_manager.h"
 #include "util/mem_info.h"
@@ -108,6 +109,7 @@ QueryContext::~QueryContext() {
     }
 
     _exec_env->runtime_query_statistics_mgr()->set_query_finished(print_id(_query_id));
+    register_query_profile();
     LOG_INFO("Query {} deconstructed, {}", print_id(_query_id), mem_tracker_msg);
     // Not release the the thread token in query context's dector method, because the query
     // conext may be dectored in the thread token it self. It is very dangerous and may core.
@@ -229,6 +231,34 @@ Status QueryContext::set_task_group(taskgroup::TaskGroupPtr& tg) {
     _task_group->get_query_scheduler(&_task_scheduler, &_scan_task_scheduler,
                                      &_non_pipe_thread_pool, &_remote_scan_task_scheduler);
     return Status::OK();
+}
+
+std::shared_ptr<std::vector<std::shared_ptr<TRuntimeProfileTree>>> QueryContext::collect_profile() {
+    auto res = std::make_shared<std::vector<std::shared_ptr<TRuntimeProfileTree>>>();
+    if (!_query_options.enable_profile) {
+        return res;
+    }
+
+    res->reserve(fragment_instance_ids.size());
+
+    for (auto& [iid, pipeline_ctx] : fragment_id_to_pipeline_ctx) {
+        res->emplace_back(pipeline_ctx->collect_profile());
+    }
+    return res;
+}
+
+void QueryContext::register_query_profile() {
+    if (!_query_options.enable_profile) {
+        return;
+    }
+
+    auto profiles = collect_profile();
+    if (profiles->empty()) {
+        return;
+    }
+
+    ExecEnv::GetInstance()->runtime_query_statistics_mgr()->register_query_profile(print_id(_query_id),
+                                                                      std::move(profiles));
 }
 
 } // namespace doris
