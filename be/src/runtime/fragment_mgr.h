@@ -143,7 +143,7 @@ public:
 
     std::string to_http_path(const std::string& file_name);
 
-    void coordinator_callback(const ReportStatusRequest& req);
+    void report_status_callback(const ReportStatusRequest& req);
 
     ThreadPool* get_thread_pool() { return _thread_pool.get(); }
 

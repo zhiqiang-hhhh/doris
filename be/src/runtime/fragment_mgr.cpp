@@ -182,7 +182,7 @@ std::string FragmentMgr::to_http_path(const std::string& file_name) {
 Status FragmentMgr::trigger_pipeline_context_report(
         const ReportStatusRequest req, std::shared_ptr<pipeline::PipelineFragmentContext>&& ctx) {
     return _async_report_thread_pool->submit_func([this, req, ctx]() {
-        coordinator_callback(req);
+        report_status_callback(req);
         if (!req.done) {
             ctx->refresh_next_report_time();
         }
@@ -193,7 +193,7 @@ Status FragmentMgr::trigger_pipeline_context_report(
 // it is only invoked from the executor's reporting thread.
 // Also, the reported status will always reflect the most recent execution status,
 // including the final status when execution finishes.
-void FragmentMgr::coordinator_callback(const ReportStatusRequest& req) {
+void FragmentMgr::report_status_callback(const ReportStatusRequest& req) {
     DCHECK(req.status.ok() || req.done); // if !status.ok() => done
     Status exec_status = req.update_fn(req.status);
     Status coord_status;
@@ -699,7 +699,7 @@ Status FragmentMgr::exec_plan_fragment(const TExecPlanFragmentParams& params,
 
     auto fragment_executor = std::make_shared<PlanFragmentExecutor>(
             _exec_env, query_ctx, params.params.fragment_instance_id, -1, params.backend_num,
-            std::bind<void>(std::mem_fn(&FragmentMgr::coordinator_callback), this,
+            std::bind<void>(std::mem_fn(&FragmentMgr::report_status_callback), this,
                             std::placeholders::_1));
     if (params.__isset.need_wait_execution_trigger && params.need_wait_execution_trigger) {
         // set need_wait_execution_trigger means this instance will not actually being executed
