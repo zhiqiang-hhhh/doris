@@ -30,6 +30,7 @@ import org.apache.doris.common.profile.Profile;
 import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.common.util.LogBuilder;
 import org.apache.doris.common.util.LogKey;
+import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.load.BrokerFileGroup;
 import org.apache.doris.load.FailMsg;
 import org.apache.doris.qe.Coordinator;
@@ -174,8 +175,11 @@ public class LoadLoadingTask extends LoadTask {
         }
 
         try {
-            QeProcessorImpl.INSTANCE.registerQuery(loadId, curCoordinator);
+            QeProcessorImpl.INSTANCE.registerQuery(loadId, new QeProcessorImpl.QueryInfo(curCoordinator));
             actualExecute(curCoordinator, timeoutS);
+            if (this.jobProfile != null) {
+                this.jobProfile.setExecutionTime(TimeUtils.getElapsedTimeMs(beginTime));
+            }
         } finally {
             QeProcessorImpl.INSTANCE.unregisterQuery(loadId);
         }
@@ -200,8 +204,6 @@ public class LoadLoadingTask extends LoadTask {
                         ErrorTabletInfo.fromThrift(curCoordinator.getErrorTabletInfos()
                                 .stream().limit(Config.max_error_tablet_of_broker_load).collect(Collectors.toList())));
                 curCoordinator.getErrorTabletInfos().clear();
-                // Create profile of this task and add to the job profile.
-                createProfile(curCoordinator);
             } else {
                 throw new LoadException(status.getErrorMsg());
             }
@@ -212,15 +214,6 @@ public class LoadLoadingTask extends LoadTask {
 
     public long getLeftTimeMs() {
         return jobDeadlineMs - System.currentTimeMillis();
-    }
-
-    private void createProfile(Coordinator coord) {
-        if (jobProfile == null) {
-            // No need to gather profile
-            return;
-        }
-        // Summary profile
-        coord.getExecutionProfile().update(beginTime, true);
     }
 
     @Override

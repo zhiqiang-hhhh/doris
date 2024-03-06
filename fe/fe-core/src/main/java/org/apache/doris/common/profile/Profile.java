@@ -19,7 +19,10 @@ package org.apache.doris.common.profile;
 
 import org.apache.doris.common.util.ProfileManager;
 import org.apache.doris.common.util.RuntimeProfile;
+import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.planner.Planner;
+import org.apache.doris.thrift.TNetworkAddress;
+import org.apache.doris.thrift.TReportExecStatusParams;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -39,6 +42,9 @@ import java.util.Map;
  *
  *
  * ExecutionProfile: Fragment 0: Fragment 1: ...
+ * And also summary profile contains plan information, but execution profile is for
+ * be execution time.
+ * StmtExecutor(Profile) ---> Coordinator(ExecutionProfile)
  */
 public class Profile {
     private static final Logger LOG = LogManager.getLogger(Profile.class);
@@ -52,11 +58,13 @@ public class Profile {
 
     private int profileLevel = 3;
 
-    public Profile(String name, boolean isEnable) {
+    public Profile(String name, boolean isEnable, int profileLevel, boolean isPipelineX) {
         this.rootProfile = new RuntimeProfile(name);
         this.summaryProfile = new SummaryProfile(rootProfile);
         // if disabled, just set isFinished to true, so that update() will do nothing
         this.isFinished = !isEnable;
+        this.profileLevel = profileLevel;
+        this.rootProfile.setIsPipelineX(isPipelineX);
     }
 
     public void setExecutionProfile(ExecutionProfile executionProfile) {
@@ -65,12 +73,18 @@ public class Profile {
             return;
         }
         this.executionProfile = executionProfile;
-        this.executionProfile.addToProfileAsChild(rootProfile);
+        this.rootProfile.addChild(this.executionProfile.getRoot());
         this.aggregatedProfile = new AggregatedProfile(rootProfile, executionProfile);
     }
 
-    public synchronized void update(long startTime, Map<String, String> summaryInfo, boolean isFinished,
-            int profileLevel, Planner planner, boolean isPipelineX) {
+    // Some load tasks use this API to update the exec time directly.
+    public synchronized void setExecutionTime(long totalTimeMs) {
+        this.executionProfile.setTotalTime(totalTimeMs);
+    }
+
+    // This API will also add the profile to ProfileManager, so that we could get the profile from ProfileManager
+    public synchronized void updateSummary(long startTime, Map<String, String> summaryInfo, boolean isFinished,
+            Planner planner) {
         try {
             if (this.isFinished) {
                 return;
@@ -80,20 +94,25 @@ public class Profile {
                 return;
             }
             summaryProfile.update(summaryInfo);
-            executionProfile.update(startTime, isFinished);
+            this.executionProfile.setTotalTime(TimeUtils.getElapsedTimeMs(startTime));
             rootProfile.computeTimeInProfile();
             // Nerids native insert not set planner, so it is null
             if (planner != null) {
                 this.planNodeMap = planner.getExplainStringMap();
             }
-            rootProfile.setIsPipelineX(isPipelineX);
             ProfileManager.getInstance().pushProfile(this);
             this.isFinished = isFinished;
-            this.profileLevel = profileLevel;
+            if (this.isFinished) {
+                this.executionProfile.finish();
+            }
         } catch (Throwable t) {
             LOG.warn("update profile failed", t);
             throw t;
         }
+    }
+
+    public synchronized void updateExecution(TReportExecStatusParams params, TNetworkAddress address) {
+        this.executionProfile.updateProfile(params, address);
     }
 
     public RuntimeProfile getRootProfile() {
@@ -120,7 +139,7 @@ public class Profile {
         }
         try {
             builder.append("\n");
-            executionProfile.getExecutionProfile().prettyPrint(builder, "");
+            executionProfile.getRoot().prettyPrint(builder, "");
         } catch (Throwable aggProfileException) {
             LOG.warn("build profile failed", aggProfileException);
             builder.append("build  profile failed");

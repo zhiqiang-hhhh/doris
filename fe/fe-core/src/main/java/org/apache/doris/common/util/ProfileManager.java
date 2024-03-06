@@ -124,7 +124,7 @@ public class ProfileManager {
         queryIdToProfileMap = new ConcurrentHashMap<>();
     }
 
-    public ProfileElement createElement(Profile profile) {
+    private ProfileElement createElement(Profile profile) {
         ProfileElement element = new ProfileElement(profile);
         element.infoStrings.putAll(profile.getSummaryProfile().getAsInfoStings());
         MultiProfileTreeBuilder builder = new MultiProfileTreeBuilder(profile.getRootProfile());

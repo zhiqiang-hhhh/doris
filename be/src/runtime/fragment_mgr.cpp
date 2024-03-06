@@ -1044,9 +1044,14 @@ void FragmentMgr::cancel_fragment_unlocked(const TUniqueId& query_id, int32_t fr
                                            const PPlanFragmentCancelReason& reason,
                                            const std::unique_lock<std::mutex>& state_lock,
                                            const std::string& msg) {
-    auto q_ctx = _query_ctx_map.find(query_id)->second;
-    auto f_context = q_ctx->fragment_id_to_pipeline_ctx.find(fragment_id);
-    if (f_context != q_ctx->fragment_id_to_pipeline_ctx.end()) {
+    auto q_ctx = _query_ctx_map.find(query_id);
+    if (q_ctx == _query_ctx_map.end()) {
+        LOG(WARNING) << "Could not find the pipeline query id:" << print_id(query_id);
+        return;
+    }
+
+    auto f_context = q_ctx->second->fragment_id_to_pipeline_ctx.find(fragment_id);
+    if (f_context != q_ctx->second->fragment_id_to_pipeline_ctx.end()) {
         f_context->second->cancel(reason, msg);
     } else {
         LOG(WARNING) << "Could not find the pipeline query id:" << print_id(query_id)

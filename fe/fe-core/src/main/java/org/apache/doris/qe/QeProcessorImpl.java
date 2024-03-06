@@ -19,9 +19,7 @@ package org.apache.doris.qe;
 
 import org.apache.doris.catalog.Env;
 import org.apache.doris.common.Config;
-import org.apache.doris.common.ThreadPoolManager;
 import org.apache.doris.common.UserException;
-import org.apache.doris.common.profile.ExecutionProfile;
 import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.thrift.TNetworkAddress;
@@ -42,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class QeProcessorImpl implements QeProcessor {
@@ -59,13 +56,8 @@ public final class QeProcessorImpl implements QeProcessor {
         INSTANCE = new QeProcessorImpl();
     }
 
-    private ExecutorService writeProfileExecutor;
-
     private QeProcessorImpl() {
         coordinatorMap = new ConcurrentHashMap<>();
-        // write profile to ProfileManager when query is running.
-        writeProfileExecutor = ThreadPoolManager.newDaemonProfileThreadPool(1, 100,
-                "profile-write-pool", true);
         queryToInstancesNum = new ConcurrentHashMap<>();
         userToInstancesCount = new ConcurrentHashMap<>();
     }
@@ -87,11 +79,6 @@ public final class QeProcessorImpl implements QeProcessor {
             res.add(co.coord);
         }
         return res;
-    }
-
-    @Override
-    public void registerQuery(TUniqueId queryId, Coordinator coord) throws UserException {
-        registerQuery(queryId, new QueryInfo(coord));
     }
 
     @Override
@@ -186,7 +173,7 @@ public final class QeProcessorImpl implements QeProcessor {
                     .connId(String.valueOf(context.getConnectionId())).db(context.getDatabase())
                     .catalog(context.getDefaultCatalog())
                     .fragmentInstanceInfos(info.getCoord().getFragmentInstanceInfos())
-                    .profile(info.getCoord().getExecutionProfile().getExecutionProfile())
+                    .profile(info.getCoord().getExecutionProfile().getRoot())
                     .isReportSucc(context.getSessionVariable().enableProfile()).build();
             querySet.put(queryIdStr, item);
         }
@@ -229,7 +216,7 @@ public final class QeProcessorImpl implements QeProcessor {
         try {
             info.getCoord().updateFragmentExecStatus(params);
             if (params.isSetProfile()) {
-                writeProfileExecutor.submit(new WriteProfileTask(params, info));
+                //info.profile.updateExecution(params, beAddr);
             }
         } catch (Exception e) {
             LOG.warn("Exception during handle report, response: {}, query: {}, instance: {}", result.toString(),
@@ -294,28 +281,6 @@ public final class QeProcessorImpl implements QeProcessor {
 
         public long getStartExecTime() {
             return startExecTime;
-        }
-    }
-
-    private class WriteProfileTask implements Runnable {
-        private TReportExecStatusParams params;
-
-        private QueryInfo queryInfo;
-
-        WriteProfileTask(TReportExecStatusParams params, QueryInfo queryInfo) {
-            this.params = params;
-            this.queryInfo = queryInfo;
-        }
-
-        @Override
-        public void run() {
-            QueryInfo info = coordinatorMap.get(params.query_id);
-            if (info == null) {
-                return;
-            }
-
-            ExecutionProfile executionProfile = info.getCoord().getExecutionProfile();
-            executionProfile.update(-1, false);
         }
     }
 }
