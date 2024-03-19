@@ -91,6 +91,7 @@
 #include "runtime/exec_env.h"
 #include "runtime/fragment_mgr.h"
 #include "runtime/runtime_filter_mgr.h"
+#include "runtime/runtime_query_statistics_mgr.h"
 #include "runtime/runtime_state.h"
 #include "runtime/stream_load/new_load_stream_mgr.h"
 #include "runtime/stream_load/stream_load_context.h"
@@ -905,21 +906,21 @@ void PipelineFragmentContext::_close_fragment_instance() {
     _runtime_state->runtime_profile()->total_time_counter()->update(
             _fragment_watcher.elapsed_time());
     static_cast<void>(send_report(true));
-    if (_runtime_state->enable_profile()) {
-        std::stringstream ss;
-        // Compute the _local_time_percent before pretty_print the runtime_profile
-        // Before add this operation, the print out like that:
-        // UNION_NODE (id=0):(Active: 56.720us, non-child: 00.00%)
-        // After add the operation, the print out like that:
-        // UNION_NODE (id=0):(Active: 56.720us, non-child: 82.53%)
-        // We can easily know the exec node execute time without child time consumed.
-        _runtime_state->runtime_profile()->compute_time_in_profile();
-        _runtime_state->runtime_profile()->pretty_print(&ss);
-        if (_runtime_state->load_channel_profile()) {
-            _runtime_state->load_channel_profile()->pretty_print(&ss);
-        }
-        LOG(INFO) << ss.str();
-    }
+    // if (_runtime_state->enable_profile()) {
+    //     std::stringstream ss;
+    //     // Compute the _local_time_percent before pretty_print the runtime_profile
+    //     // Before add this operation, the print out like that:
+    //     // UNION_NODE (id=0):(Active: 56.720us, non-child: 00.00%)
+    //     // After add the operation, the print out like that:
+    //     // UNION_NODE (id=0):(Active: 56.720us, non-child: 82.53%)
+    //     // We can easily know the exec node execute time without child time consumed.
+    //     _runtime_state->runtime_profile()->compute_time_in_profile();
+    //     _runtime_state->runtime_profile()->pretty_print(&ss);
+    //     if (_runtime_state->load_channel_profile()) {
+    //         _runtime_state->load_channel_profile()->pretty_print(&ss);
+    //     }
+    //     LOG(INFO) << ss.str();
+    // }
     // all submitted tasks done
     _exec_env->fragment_mgr()->remove_pipeline_context(
             std::dynamic_pointer_cast<PipelineFragmentContext>(shared_from_this()));

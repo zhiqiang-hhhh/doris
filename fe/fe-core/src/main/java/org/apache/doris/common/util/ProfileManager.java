@@ -27,6 +27,18 @@ import org.apache.doris.common.profile.ProfileTreeBuilder;
 import org.apache.doris.common.profile.ProfileTreeNode;
 import org.apache.doris.common.profile.SummaryProfile;
 import org.apache.doris.nereids.stats.StatsErrorEstimator;
+import org.apache.doris.plsql.Exec;
+import org.apache.doris.plsql.Stmt;
+import org.apache.doris.qe.CoordInterface;
+import org.apache.doris.qe.Coordinator;
+import org.apache.doris.qe.StmtExecutor;
+import org.apache.doris.system.SystemInfoService;
+import org.apache.doris.thrift.TDetailedReportParams;
+import org.apache.doris.thrift.TNetworkAddress;
+import org.apache.doris.thrift.TSendStatsRequest;
+import org.apache.doris.thrift.TSendStatsResult;
+import org.apache.doris.thrift.TStatus;
+import org.apache.doris.thrift.TStatusCode;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -94,6 +106,36 @@ public class ProfileManager {
         public void setStatsErrorEstimator(StatsErrorEstimator statsErrorEstimator) {
             this.statsErrorEstimator = statsErrorEstimator;
         }
+
+        public void updateProfile(TSendStatsRequest req) {
+            List<RuntimeProfile> pipelineProfiles = Lists.newArrayList();
+            for (Map.Entry<Integer, List<TDetailedReportParams>> fidAndFragmentProfile :
+                req.fragment_id_to_detailed_report.entrySet()) {
+                LOG.info("Profile {} fragment id {} pipeline count {}",
+                        DebugUtil.printId(req.query_id), fidAndFragmentProfile.getKey(), fidAndFragmentProfile.getValue().size());
+
+                int pipelineId = 0;
+                for (TDetailedReportParams detailReport : fidAndFragmentProfile.getValue()) {
+                    String name = "Pipeline :" + pipelineId + " " + " (host=" + req.backend_id + ")";
+                    pipelineId++;
+                    RuntimeProfile pipelineProfile = new RuntimeProfile(name);
+                    // Convert TRuntimeProfile to RuntimeProfile
+                    pipelineProfile.update(detailReport.profile);
+                    pipelineProfile.setIsDone(req.isFinished());
+                    pipelineProfiles.add(pipelineProfile);
+                    this.profile.getExecutionProfile().addPipelineProfile(fidAndFragmentProfile.getKey(), pipelineProfile);
+                }
+
+                // TODO: backend_id -> address
+                TNetworkAddress tmpAddress = new TNetworkAddress();
+                this.profile.getExecutionProfile()
+                           .addMultiBeProfileByPipelineX(
+                                fidAndFragmentProfile.getKey(),
+                                tmpAddress,
+                                pipelineProfiles);
+            }
+            // TODO: LOAD PROFILE
+        }
     }
 
     // only protect queryIdDeque; queryIdToProfileMap is concurrent, no need to protect
@@ -154,6 +196,8 @@ public class ProfileManager {
         if (Strings.isNullOrEmpty(key)) {
             LOG.warn("the key or value of Map is null, "
                     + "may be forget to insert 'QUERY_ID' or 'JOB_ID' column into infoStrings");
+        } else {
+            LOG.info("Push profile {}", key);
         }
 
         writeLock.lock();
@@ -366,5 +410,29 @@ public class ProfileManager {
         } finally {
             writeLock.unlock();
         }
+    }
+
+    public TSendStatsResult process(TSendStatsRequest req) {
+        TSendStatsResult result = new TSendStatsResult();
+        result.status = new TStatus(TStatusCode.OK);
+
+        if (!req.isSetQueryId()) {
+            LOG.warn("Received stats of {}, but detailed report is not set", DebugUtil.printId(req.query_id));
+            return result;
+        } else {
+            LOG.warn("Received stats of {}", DebugUtil.printId(req.query_id));
+            ProfileElement element = queryIdToProfileMap.get(DebugUtil.printId(req.query_id));
+            if (element != null) {
+                try {
+                    element.updateProfile(req);
+                } catch (Exception e) {
+                    LOG.warn("Failed to update statistics for query {}", DebugUtil.printId(req.query_id), e);
+                }
+            } else {
+                LOG.warn("No coordinator for query {}", DebugUtil.printId(req.query_id));
+            }
+        }
+
+        return result;
     }
 }

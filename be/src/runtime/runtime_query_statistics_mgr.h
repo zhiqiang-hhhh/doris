@@ -18,10 +18,14 @@
 #pragma once
 
 #include <gen_cpp/Data_types.h>
+#include <gen_cpp/RuntimeProfile_types.h>
+#include <gen_cpp/Types_types.h>
 
+#include <memory>
 #include <shared_mutex>
 #include <string>
 
+#include "profile/profile.h"
 #include "runtime/query_statistics.h"
 #include "runtime/workload_management/workload_condition.h"
 #include "util/time.h"
@@ -75,9 +79,30 @@ public:
     // used for backend_active_tasks
     void get_active_be_tasks_block(vectorized::Block* block);
 
+    void register_fragment_profile_x(const TUniqueId& query_id, int32_t fragment_id,
+                                     const TNetworkAddress& const_addr,
+                                     const profile::FragmentProfileX& profile);
+
+    void report_query_profiles_x();
+
 private:
     std::shared_mutex _qs_ctx_map_lock;
     std::map<std::string, std::unique_ptr<QueryStatisticsCtx>> _query_statistics_ctx_map;
+
+    struct CoorAddrFragmentProfile {
+        TNetworkAddress coordinator_addr;
+        TUniqueId query_id;
+        profile::FragmentProfileX fragment_profile;
+    };
+
+    std::shared_mutex _query_profile_map_lock;
+    using CoorAddrFragmentProfilePtr =
+            std::shared_ptr<CoorAddrFragmentProfile>;
+
+    using QueryIdFragmentId = std::pair<std::string, int32_t>;
+    // <query_id, fragment_id> -> {coordinator_addr, query_id, profile}
+    std::map<QueryIdFragmentId, CoorAddrFragmentProfilePtr>
+            _fragment_profile_map_x;
 };
 
 } // namespace doris

@@ -144,6 +144,9 @@ Status PipelineXTask::_extract_dependencies() {
 }
 
 void PipelineXTask::_init_profile() {
+    LOG_INFO("query {} fragment {} task {} init_profile",
+             print_id(this->query_context()->query_id()),
+             this->fragment_context()->get_fragment_id(), _task_idx);
     std::stringstream ss;
     ss << "PipelineXTask"
        << " (index=" << _index << ")";

@@ -259,6 +259,8 @@ Status PipelineXFragmentContext::prepare(const doris::TPipelineFragmentParams& r
         pipeline->children().clear();
         RETURN_IF_ERROR(pipeline->prepare(_runtime_state.get()));
     }
+    LOG_INFO("Query {} fragment {} has {} pipelines", print_id(this->_query_id), this->_fragment_id,
+             _pipelines.size());
 
     // 5. Build pipeline tasks and initialize local state.
     RETURN_IF_ERROR(_build_pipeline_tasks(request));
@@ -486,8 +488,8 @@ Status PipelineXFragmentContext::_build_pipeline_tasks(
         }
     }
 
-    for (size_t i = 0; i < target_size; i++) {
-        const auto& local_params = request.local_params[i];
+    for (size_t parallism = 0; parallism < target_size; parallism++) {
+        const auto& local_params = request.local_params[parallism];
         auto fragment_instance_id = local_params.fragment_instance_id;
         _fragment_instance_ids.push_back(fragment_instance_id);
         std::unique_ptr<RuntimeFilterMgr> runtime_filter_mgr;
@@ -584,10 +586,15 @@ Status PipelineXFragmentContext::_build_pipeline_tasks(
                 task_runtime_state->set_task_id(cur_task_id);
                 auto task = std::make_unique<PipelineXTask>(
                         pipeline, cur_task_id, get_task_runtime_state(cur_task_id), this,
-                        pipeline_id_to_profile[pip_idx].get(), get_local_exchange_state(pipeline),
-                        i);
+                        pipeline_id_to_profile[pip_idx].get(), /* parent profile */
+                        get_local_exchange_state(pipeline), parallism);
                 pipeline_id_to_task.insert({pipeline->id(), task.get()});
-                _tasks[i].emplace_back(std::move(task));
+                _tasks[parallism].emplace_back(std::move(task));
+                LOG_INFO(
+                        "Create pipeline task x {}, qid {} fid {} pipeline {}/{}, pipeline id {} "
+                        "para_id {}",
+                        cur_task_id, print_id(this->_query_id), this->_fragment_id, pip_idx + 1,
+                        _pipelines.size(), pipeline->id(), parallism);
             }
         }
 
@@ -651,6 +658,11 @@ Status PipelineXFragmentContext::_build_pipeline_tasks(
             _runtime_filter_mgr_map[fragment_instance_id] = std::move(runtime_filter_mgr);
         }
     }
+
+    LOG_INFO("Query {} fragment {} has {} pipeline x tasks, num pipeline {} parallism {}",
+             print_id(this->_query_id), this->_fragment_id, _total_tasks, _pipelines.size(),
+             target_size);
+
     _pipeline_parent_map.clear();
     _dag.clear();
     _op_id_to_le_state.clear();

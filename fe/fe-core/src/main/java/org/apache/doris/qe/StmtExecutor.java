@@ -108,6 +108,7 @@ import org.apache.doris.common.util.DebugPointUtil;
 import org.apache.doris.common.util.DebugPointUtil.DebugPoint;
 import org.apache.doris.common.util.DebugUtil;
 import org.apache.doris.common.util.MetaLockUtils;
+import org.apache.doris.common.util.ProfileManager;
 import org.apache.doris.common.util.ProfileManager.ProfileType;
 import org.apache.doris.common.util.SqlParserUtils;
 import org.apache.doris.common.util.TimeUtils;
@@ -260,8 +261,7 @@ public class StmtExecutor {
         this.isProxy = isProxy;
         this.statementContext = new StatementContext(context, originStmt);
         this.context.setStatementContext(statementContext);
-        this.profile = new Profile("Query", this.context.getSessionVariable().enableProfile,
-                this.context.getSessionVariable().profileLevel,
+        this.profile = new Profile("Query", this.context.getSessionVariable().profileLevel,
                 this.context.getSessionVariable().getEnablePipelineXEngine());
     }
 
@@ -292,8 +292,8 @@ public class StmtExecutor {
             this.statementContext.setParsedStatement(parsedStmt);
         }
         this.context.setStatementContext(statementContext);
-        this.profile = new Profile("Query", context.getSessionVariable().enableProfile(),
-                context.getSessionVariable().profileLevel, context.getSessionVariable().getEnablePipelineXEngine());
+        this.profile = new Profile("Query", context.getSessionVariable().profileLevel,
+                context.getSessionVariable().getEnablePipelineXEngine());
     }
 
     public static InternalService.PDataRow getRowStringValue(List<Expr> cols) throws UserException {
@@ -995,10 +995,10 @@ public class StmtExecutor {
     }
 
     public void updateProfile(boolean isFinished) {
-        if (!context.getSessionVariable().enableProfile()) {
-            return;
-        }
-        // If any error happends in update profile, we should ignore this error
+        // if (!context.getSessionVariable().enableProfile()) {
+        //     return;
+        // }
+        // If any error happens in update profile, we should ignore this error
         // and ensure the sql is finished normally. For example, if update profile
         // failed, the insert stmt should be success
         try {
@@ -1599,7 +1599,9 @@ public class StmtExecutor {
             profile.setExecutionProfile(coord.getExecutionProfile());
             coordBase = coord;
         }
-
+        LOG.info("TRAAC");
+        updateProfile(false);
+        LOG.info("TRAAC");
         try {
             coordBase.exec();
             profile.getSummaryProfile().setQueryScheduleFinishTime();

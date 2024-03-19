@@ -476,11 +476,35 @@ struct TReportExecStatusParams {
 
   22: optional i32 finished_scan_ranges
 
+  // remove this filed in the future
   23: optional list<TDetailedReportParams> detailed_report
 
   24: optional TQueryStatistics query_statistics // deprecated
 
   25: optional TReportWorkloadRuntimeStatusParams report_workload_runtime_status
+}
+
+// 为什么无法把这个字段单独放在另一个 thrift 文件里？
+// 因为 thrift 无法处理循环引用，而我们目前糟糕的设计导致无法把当前文件中 profile 汇报相关的数据结构移出去
+// we want to use this struct to hold all the statistics of a "query"
+// and the concept of query may be discard or renamed to something like task/job
+// in the future so we do not name this with "query"
+struct TSendStatsRequest {
+    // currently id just means the query id
+    1: optional Types.TUniqueId query_id
+    
+    2: optional map<i32, list<TDetailedReportParams>> fragment_id_to_detailed_report
+    
+    // in theory, backend_id is not needed, but we have to since the poor & careless api design
+    3: optional i64 backend_id
+    // finished means succeed or failed
+    4: optional bool finished
+    5: Types.TNetworkAddress backend_address
+}
+
+
+struct TSendStatsResult {
+    1: Status.TStatus status
 }
 
 struct TFeResult {
@@ -1506,4 +1530,6 @@ service FrontendService {
 
     TShowProcessListResult showProcessList(1: TShowProcessListRequest request)
     Status.TStatus reportCommitTxnResult(1: TReportCommitTxnResultRequest request)
+
+    TSendStatsResult sendStats(1: TSendStatsRequest request)
 }

@@ -19,12 +19,17 @@
 
 #include <exception>
 #include <memory>
+#include <mutex>
+#include <sstream>
 
 #include "pipeline/pipeline_fragment_context.h"
 #include "pipeline/pipeline_x/dependency.h"
+#include "runtime/exec_env.h"
+#include "runtime/profile/profile.h"
 #include "runtime/runtime_query_statistics_mgr.h"
 #include "runtime/workload_group/workload_group_manager.h"
 #include "util/mem_info.h"
+#include "util/uid_util.h"
 
 namespace doris {
 
@@ -109,7 +114,8 @@ QueryContext::~QueryContext() {
     }
 
     _exec_env->runtime_query_statistics_mgr()->set_query_finished(print_id(_query_id));
-    LOG_INFO("Query {} deconstructed, {}", print_id(_query_id), mem_tracker_msg);
+
+    register_query_profile();
     // Not release the the thread token in query context's dector method, because the query
     // conext may be dectored in the thread token it self. It is very dangerous and may core.
     // And also thread token need shutdown, it may take some time, may cause the thread that
@@ -127,6 +133,8 @@ QueryContext::~QueryContext() {
             LOG(WARNING) << "Dump trace log failed bacause " << e.what();
         }
     }
+
+    LOG_INFO("Query {} deconstructed, {}", print_id(this->_query_id), mem_tracker_msg);
 }
 
 void QueryContext::set_ready_to_execute(bool is_cancelled) {
@@ -230,6 +238,67 @@ Status QueryContext::set_workload_group(WorkloadGroupPtr& tg) {
     _workload_group->get_query_scheduler(&_task_scheduler, &_scan_task_scheduler,
                                          &_non_pipe_thread_pool, &_remote_scan_task_scheduler);
     return Status::OK();
+}
+
+// QueryProfilePtr QueryContext::collect_profile(bool finished) {
+//     QueryProfilePtr res = std::make_shared<QueryProfile>();
+//     res->query_id = this->_query_id;
+
+//     LOG_INFO("Query {} running fragment: {}", print_id(_query_id),
+//              fragment_id_to_pipeline_ctx.size());
+
+//     std::lock_guard<std::mutex> lock(_profile_mutex);
+
+//     for (auto& [fid, pipeline_ctx] : fragment_id_to_pipeline_ctx) {
+//         const std::string iid_str = print_id(pipeline_ctx->get_fragment_instance_id());
+//         _profile_map[iid_str] = pipeline_ctx->collect_profile();
+//     }
+
+//     for (auto& [iid, instance_profile] : _profile_map) {
+//         res->instance_profiles.push_back(instance_profile);
+//     }
+
+//     res->finished = finished;
+
+//     LOG_INFO("Query {} collected {} profiles", print_id(_query_id), res->instance_profiles.size());
+
+//     return res;
+// }
+
+void QueryContext::register_query_profile() {
+    if (!enable_pipeline_x_exec()) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lg(_profile_mutex);
+
+    for (auto& [fid, f_profile] : _profile_map_x) {
+        profile::FragmentProfileX tmp_f_profile;
+
+        for (auto p_profile : f_profile.second) {
+            tmp_f_profile.push_back(
+                    std::make_shared<profile::PipelineProfileX>(fid, f_profile.first, p_profile));
+            LOG_INFO("fid {} finish {} profile {}", fid, f_profile.first, p_profile->nodes.front().name);
+        }
+
+        LOG_INFO("Before mgr register profile query {} fragment {} pipline profile count {}",
+                 print_id(_query_id), fid, tmp_f_profile.size());
+
+        ExecEnv::GetInstance()->runtime_query_statistics_mgr()->register_fragment_profile_x(
+                _query_id, fid, this->coord_addr, tmp_f_profile);
+    }
+
+    _profile_map_x.clear();
+}
+
+void QueryContext::add_fragment_profile_x(int fragment_id, bool finished,
+                                const std::vector<profile::TRuntimeProfilePtr>& pipeline_profile) {
+    LOG_INFO("Query add fragment profile, query {}, fragment {}, pipeline profile count {} ",
+                print_id(this->_query_id), fragment_id, pipeline_profile.size());
+    std::lock_guard<std::mutex> l(_profile_mutex);
+    _profile_map_x[fragment_id] = std::make_pair(finished, pipeline_profile);
+    LOG_INFO("After add, fragment {}, finished {}, pipeline profile count {}",
+            fragment_id, _profile_map_x[fragment_id].first, _profile_map_x[fragment_id].second.size());
 }
 
 } // namespace doris

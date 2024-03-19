@@ -182,7 +182,7 @@ std::string FragmentMgr::to_http_path(const std::string& file_name) {
 Status FragmentMgr::trigger_pipeline_context_report(
         const ReportStatusRequest req, std::shared_ptr<pipeline::PipelineFragmentContext>&& ctx) {
     return _async_report_thread_pool->submit_func([this, req, ctx]() {
-        coordinator_callback(req);
+        report_status_callback(req);
         if (!req.done) {
             ctx->refresh_next_report_time();
         }
@@ -193,7 +193,7 @@ Status FragmentMgr::trigger_pipeline_context_report(
 // it is only invoked from the executor's reporting thread.
 // Also, the reported status will always reflect the most recent execution status,
 // including the final status when execution finishes.
-void FragmentMgr::coordinator_callback(const ReportStatusRequest& req) {
+void FragmentMgr::report_status_callback(const ReportStatusRequest& req) {
     DCHECK(req.status.ok() || req.done); // if !status.ok() => done
     Status exec_status = req.update_fn(req.status);
     Status coord_status;
@@ -235,10 +235,9 @@ void FragmentMgr::coordinator_callback(const ReportStatusRequest& req) {
             DCHECK(!req.runtime_states.empty());
             const bool enable_profile = (*req.runtime_states.begin())->enable_profile();
             if (enable_profile) {
-                params.__isset.profile = true;
+                params.__isset.profile = false;
                 params.__isset.loadChannelProfile = false;
                 for (auto* rs : req.runtime_states) {
-                    DCHECK(req.load_channel_profile);
                     TDetailedReportParams detailed_param;
                     rs->load_channel_profile()->to_thrift(&detailed_param.loadChannelProfile);
                     // merge all runtime_states.loadChannelProfile to req.load_channel_profile
@@ -250,14 +249,30 @@ void FragmentMgr::coordinator_callback(const ReportStatusRequest& req) {
             }
 
             if (enable_profile) {
-                for (auto& pipeline_profile : req.runtime_state->pipeline_id_to_profile()) {
-                    TDetailedReportParams detailed_param;
-                    detailed_param.__isset.fragment_instance_id = false;
-                    detailed_param.__isset.profile = true;
-                    detailed_param.__isset.loadChannelProfile = false;
-                    pipeline_profile->to_thrift(&detailed_param.profile);
-                    params.detailed_report.push_back(detailed_param);
-                }
+                // QueryProfilePtr pipeline_x_query_profile = std::make_shared<QueryProfile>();
+                // pipeline_x_query_profile->query_id = req.query_id;
+                // pipeline_x_query_profile->finished = req.done;
+
+                // for (auto& pipeline_profile : req.runtime_state->pipeline_id_to_profile()) {
+                //     PipelineXTaskProfilePtr pipeline_x_task_profile =
+                //             std::make_shared<InstanceProfile>();
+                //     pipeline_x_task_profile->fragment_id = req.runtime_state->fragment_id();
+                //     pipeline_x_task_profile->instance_id = req.fragment_instance_id;
+                //     pipeline_profile->to_thrift(&pipeline_x_task_profile->profile);
+
+                //     LOG_INFO("req.runtime_state->fragment_id() {}, Content\n{}",
+                //              req.runtime_state->fragment_id(),
+                //              apache::thrift::ThriftDebugString(pipeline_x_task_profile->profile)
+                //                      .c_str());
+
+                //     pipeline_x_query_profile->pipeline_x_task_profiles.push_back(
+                //             pipeline_x_task_profile);
+                // }
+
+                // ExecEnv::GetInstance()->runtime_query_statistics_mgr()->register_query_profile_x(
+                //         print_id(req.query_id), req.fragment_id,
+                //         std::make_shared<ProfileReportQueueEntry>(req.coord_addr,
+                //                                                   pipeline_x_query_profile));
             }
         } else {
             if (req.profile != nullptr) {
@@ -579,7 +594,13 @@ void FragmentMgr::remove_pipeline_context(
     }
     {
         std::lock_guard<std::mutex> plock(q_context->pipeline_lock);
+
         if (q_context->fragment_id_to_pipeline_ctx.contains(f_context->get_fragment_id())) {
+            auto f_context_x = q_context->fragment_id_to_pipeline_ctx[f_context->get_fragment_id()];
+            // store pipeline x fragment profile to query context
+            q_context->add_fragment_profile_x(f_context->get_fragment_id(), true /*finished*/,
+                                              f_context_x->collect_profile_x());
+
             q_context->fragment_id_to_pipeline_ctx.erase(f_context->get_fragment_id());
         }
     }
@@ -701,7 +722,7 @@ Status FragmentMgr::exec_plan_fragment(const TExecPlanFragmentParams& params,
 
     auto fragment_executor = std::make_shared<PlanFragmentExecutor>(
             _exec_env, query_ctx, params.params.fragment_instance_id, -1, params.backend_num,
-            std::bind<void>(std::mem_fn(&FragmentMgr::coordinator_callback), this,
+            std::bind<void>(std::mem_fn(&FragmentMgr::report_status_callback), this,
                             std::placeholders::_1));
     if (params.__isset.need_wait_execution_trigger && params.need_wait_execution_trigger) {
         // set need_wait_execution_trigger means this instance will not actually being executed
@@ -774,12 +795,12 @@ std::string FragmentMgr::dump_pipeline_tasks() {
 
 Status FragmentMgr::exec_plan_fragment(const TPipelineFragmentParams& params,
                                        const FinishCallback& cb) {
-    VLOG_ROW << "query: " << print_id(params.query_id) << " exec_plan_fragment params is "
-             << apache::thrift::ThriftDebugString(params).c_str();
+    // VLOG_ROW << "query: " << print_id(params.query_id) << " exec_plan_fragment params is "
+    //          << apache::thrift::ThriftDebugString(params).c_str();
     // sometimes TExecPlanFragmentParams debug string is too long and glog
     // will truncate the log line, so print query options seperately for debuggin purpose
-    VLOG_ROW << "query: " << print_id(params.query_id) << "query options is "
-             << apache::thrift::ThriftDebugString(params.query_options).c_str();
+    // VLOG_ROW << "query: " << print_id(params.query_id) << "query options is "
+    //          << apache::thrift::ThriftDebugString(params.query_options).c_str();
 
     std::shared_ptr<QueryContext> query_ctx;
     RETURN_IF_ERROR(_get_query_ctx(params, params.query_id, true, query_ctx));
@@ -795,6 +816,12 @@ Status FragmentMgr::exec_plan_fragment(const TPipelineFragmentParams& params,
                         std::bind<Status>(
                                 std::mem_fn(&FragmentMgr::trigger_pipeline_context_report), this,
                                 std::placeholders::_1, std::placeholders::_2));
+
+        LOG_INFO(
+                "Query {} pipeline x fragment context created, fragment id {}, x task num of each "
+                "pipeline: {}",
+                print_id(params.query_id), params.fragment_id, params.local_params.size());
+
         {
             SCOPED_RAW_TIMER(&duration_ns);
             auto prepare_st = context->prepare(params);

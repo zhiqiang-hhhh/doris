@@ -95,10 +95,12 @@ public class ExecutionProfile {
 
     public void addMultiBeProfileByPipelineX(int profileFragmentId, TNetworkAddress address,
             List<RuntimeProfile> taskProfile) {
-        multiBeProfile.get(profileFragmentId).put(address, taskProfile);
+        int convertedFid = fragmentIDIdx.get(new PlanFragmentId(profileFragmentId));
+        multiBeProfile.get(convertedFid).put(address, taskProfile);
     }
 
     private List<List<RuntimeProfile>> getMultiBeProfile(int profileFragmentId) {
+        profileFragmentId = fragmentIDIdx.get(new PlanFragmentId(profileFragmentId));
         Map<TNetworkAddress, List<RuntimeProfile>> multiPipeline = multiBeProfile.get(profileFragmentId);
         List<List<RuntimeProfile>> allPipelines = Lists.newArrayList();
         int pipelineSize = 0;
@@ -247,8 +249,13 @@ public class ExecutionProfile {
     }
 
     public void addInstanceProfile(int fragmentId, RuntimeProfile instanceProfile) {
-        Preconditions.checkArgument(fragmentId < fragmentProfiles.size(),
-                fragmentId + " vs. " + fragmentProfiles.size());
-        fragmentProfiles.get(fragmentId).addChild(instanceProfile);
+        int convertedFid = fragmentIDIdx.get(new PlanFragmentId(fragmentId));
+        Preconditions.checkArgument(convertedFid < fragmentProfiles.size(),
+                                    convertedFid + " vs. " + fragmentProfiles.size());
+        fragmentProfiles.get(convertedFid).addChild(instanceProfile);
+    }
+
+    public void addPipelineProfile(int fragmentId, RuntimeProfile pipelineProfile) {
+        this.addInstanceProfile(fragmentId, pipelineProfile);
     }
 }

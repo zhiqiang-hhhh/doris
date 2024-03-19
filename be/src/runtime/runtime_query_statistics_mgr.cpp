@@ -17,13 +17,74 @@
 
 #include "runtime/runtime_query_statistics_mgr.h"
 
+#include <gen_cpp/FrontendService_types.h>
+#include <gen_cpp/Types_types.h>
+#include <thrift/TApplicationException.h>
+
+#include <cstdint>
+#include <string>
+
+#include "common/logging.h"
 #include "runtime/client_cache.h"
 #include "runtime/exec_env.h"
+#include "runtime/profile/profile.h"
+#include "service/backend_options.h"
 #include "util/debug_util.h"
 #include "util/time.h"
+#include "util/uid_util.h"
 #include "vec/core/block.h"
 
 namespace doris {
+
+static Status _doSendStatsRpc(TNetworkAddress coor_addr, TSendStatsRequest& req,
+                              TSendStatsResult& res) {
+    Status client_status;
+    FrontendServiceConnection rpc_client(ExecEnv::GetInstance()->frontend_client_cache(), coor_addr,
+                                         &client_status);
+    if (!client_status.ok()) {
+        LOG_WARNING(
+                "could not get client rpc client of {} when reporting profiles, reason is {}, "
+                "not reporting, profile will be lost",
+                PrintThriftNetworkAddress(coor_addr), client_status.to_string());
+        return Status::RpcError("Client rpc client failed");
+    }
+
+    try {
+        try {
+            rpc_client->sendStats(res, req);
+        } catch (const apache::thrift::transport::TTransportException& e) {
+            LOG_WARNING("Transport exception from {}, reason: {}, reopening",
+                        PrintThriftNetworkAddress(coor_addr), e.what());
+            SleepForMs(std::random_device {}() % 1000);
+            client_status = rpc_client.reopen(config::thrift_rpc_timeout_ms);
+            if (!client_status.ok()) {
+                LOG_WARNING("Reopen failed, reason: {}", client_status.to_string());
+                return Status::RpcError("Open rpc client failed");
+            }
+
+            rpc_client->sendStats(res, req);
+        }
+    } catch (apache::thrift::TApplicationException& e) {
+        if (e.getType() == e.UNKNOWN_METHOD) {
+            LOG_WARNING(
+                    "Failed to send statistics to {} due to {}, usually because the frontend "
+                    "is not upgraded, check the version",
+                    PrintThriftNetworkAddress(coor_addr), e.what());
+        } else {
+            LOG_WARNING(
+                    "Failed to send statistics to {}, reason: {}, you can see fe log for "
+                    "details.",
+                    PrintThriftNetworkAddress(coor_addr), e.what());
+        }
+        return Status::RpcError("Send stats failed");
+    } catch (std::exception& e) {
+        LOG_WARNING("Failed to send statistics to {}, reason: {}, you can see fe log for details.",
+                    PrintThriftNetworkAddress(coor_addr), e.what());
+        return Status::RpcError("Send stats failed");
+    }
+
+    return Status::OK();
+}
 
 void QueryStatisticsCtx::collect_query_statistics(TQueryStatistics* tq_s) {
     QueryStatistics tmp_qs;
@@ -245,6 +306,100 @@ void RuntimeQueryStatiticsMgr::get_active_be_tasks_block(vectorized::Block* bloc
         insert_int_value(8, tqs.current_used_memory_bytes, block);
         insert_int_value(9, tqs.shuffle_send_bytes, block);
         insert_int_value(10, tqs.shuffle_send_rows, block);
+    }
+}
+
+void RuntimeQueryStatiticsMgr::register_fragment_profile_x(
+        const TUniqueId& q_id, int32_t f_id, const TNetworkAddress& coor_addr,
+        const profile::FragmentProfileX& f_profile) {
+    std::lock_guard<std::shared_mutex> lg(_query_profile_map_lock);
+
+    _fragment_profile_map_x[std::make_pair(print_id(q_id), f_id)] =
+            std::make_shared<CoorAddrFragmentProfile>(coor_addr, q_id, f_profile);
+
+    LOG_INFO("register x profile done {}, fragment {}, profiles {}", print_id(q_id),
+             f_id, f_profile.size());
+}
+
+void RuntimeQueryStatiticsMgr::report_query_profiles_x() {
+    // query_id -> <fragment_id, fragment_profile>
+    std::map<std::string, std::map<int32_t, std::shared_ptr<CoorAddrFragmentProfile>>>
+            profile_copy;
+
+    // convert {query_id, fragment_id} -> fragment_profile
+    // to query_id -> <fragment_id, fragment_profile>
+    // so that we can consturct rpc request easier
+    {
+        std::lock_guard<std::shared_mutex> lg(_query_profile_map_lock);
+
+        for (auto& [qid_fid, f_profile] : _fragment_profile_map_x) {
+            const auto& q_id = qid_fid.first;
+            const auto& f_id = qid_fid.second;
+
+            if (profile_copy.contains(q_id)) {
+                profile_copy[q_id][f_id] = f_profile;
+            } else {
+                profile_copy[q_id] =
+                        std::map<int32_t, std::shared_ptr<CoorAddrFragmentProfile>> {
+                                {f_id, f_profile}};
+            }
+        }
+
+        _fragment_profile_map_x.clear();
+    }
+
+
+    // for each query, construct a map<fragment_id, std::vector<TRuntimeProfileTree>>
+    // profile will be sent in unit of query
+    for (const auto& [q_id, f_id_f_profile] : profile_copy) {
+        const TUniqueId thrift_q_id = f_id_f_profile.begin()->second->query_id;
+        TSendStatsRequest req;
+        req.__set_query_id(thrift_q_id);
+        req.__set_backend_id(ExecEnv::GetInstance()->master_info()->backend_id);
+        std::map<int32_t, std::vector<TDetailedReportParams>> fragment_id_to_detailed_report;
+
+        for (const auto& [f_id, f_profile] : f_id_f_profile) {
+            std::vector<TDetailedReportParams> detailed_reports;
+            // fragment_profile contains flatten profile of one fragment
+            // Pattern:
+            // Pipeline 0
+            //      PipelineTask 0
+            //              Operator 1
+            //              Operator 2
+            //              Scanner
+            //      PipelineTask 1
+            //              Operator 1
+            //              Operator 2
+            //              Scanner
+            // Pipeline 1
+            //      PipelineTask 2
+            //              Operator 3
+            //      PipelineTask 3
+            //              Operator 3
+
+            for (const auto& p_profile : f_profile->fragment_profile) {
+                TDetailedReportParams tmp;
+                tmp.__set_profile(*p_profile->pipeline_profile);
+                // tmp.fragment_instance_id is not needed for pipeline x
+                detailed_reports.push_back(tmp);
+            }
+
+            fragment_id_to_detailed_report[f_id] = detailed_reports;
+        }
+
+        req.__set_fragment_id_to_detailed_report(fragment_id_to_detailed_report);
+
+        const auto& coor_addr = f_id_f_profile.begin()->second->coordinator_addr;
+        TSendStatsResult res;
+        auto rpc_status = _doSendStatsRpc(coor_addr, req, res);
+
+        if (res.status.status_code != TStatusCode::OK) {
+            LOG_WARNING("query {} send statistics to {} failed", print_id(req.query_id),
+                        PrintThriftNetworkAddress(coor_addr));
+        } else {
+            LOG_INFO("query {} send statistics to {} success", print_id(req.query_id),
+                     PrintThriftNetworkAddress(coor_addr));
+        }
     }
 }
 

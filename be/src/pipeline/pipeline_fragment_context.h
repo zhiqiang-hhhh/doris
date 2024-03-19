@@ -17,21 +17,25 @@
 
 #pragma once
 
+#include <gen_cpp/RuntimeProfile_types.h>
 #include <gen_cpp/Types_types.h>
 #include <gen_cpp/types.pb.h>
 
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "common/status.h"
 #include "pipeline/pipeline.h"
 #include "pipeline/pipeline_task.h"
+#include "runtime/profile/profile.h"
 #include "runtime/query_context.h"
 #include "runtime/runtime_state.h"
 #include "runtime/task_execution_context.h"
@@ -139,6 +143,31 @@ public:
     virtual std::string debug_string();
 
     uint64_t create_time() const { return _create_time; }
+
+    std::vector<profile::TRuntimeProfilePtr> collect_profile_x() const {
+        std::vector<profile::TRuntimeProfilePtr> res;
+        std::stringstream ss;
+
+        for (auto& pipeline_profile : _runtime_state->pipeline_id_to_profile()) {
+            auto profile_ptr = std::make_shared<TRuntimeProfileTree>();
+            pipeline_profile->to_thrift(&(*profile_ptr));
+            res.push_back(profile_ptr);
+
+            std::vector<RuntimeProfile*> task_x_profile;
+            pipeline_profile->get_all_children(&task_x_profile);
+            for (RuntimeProfile* p : task_x_profile) {
+                if (p->name().find("PipelineXTask") != std::string::npos) {
+                    ss << p->name() << '\n';
+                } else {
+                    ss << '\t' << p->name() << '\n';
+                }
+            }
+        }
+
+        LOG_INFO("Query {} fragment {} profile\n{} ",
+                 print_id(this->_query_id), this->_fragment_id, ss.str());
+        return res;
+    }
 
 protected:
     Status _create_sink(int sender_id, const TDataSink& t_data_sink, RuntimeState* state);

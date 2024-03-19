@@ -18,15 +18,18 @@
 #pragma once
 
 #include <gen_cpp/PaloInternalService_types.h>
+#include <gen_cpp/RuntimeProfile_types.h>
 #include <gen_cpp/Types_types.h>
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "common/config.h"
 #include "common/factory_creator.h"
 #include "common/object_pool.h"
+#include "profile/profile.h"
 #include "runtime/exec_env.h"
 #include "runtime/memory/mem_tracker_limiter.h"
 #include "runtime/query_statistics.h"
@@ -311,6 +314,32 @@ private:
     // This shared ptr is never used. It is just a reference to hold the object.
     // There is a weak ptr in runtime filter manager to reference this object.
     std::shared_ptr<RuntimeFilterMergeControllerEntity> _merge_controller_handler;
+
+    std::mutex _profile_mutex;
+    // instance_id -> profile
+    // std::map<std::string, InstanceProfilePtr> _profile_map;
+    // fragment_id -> <finished, list<profile>>
+    std::map<int, std::pair<bool, std::vector<profile::TRuntimeProfilePtr>>> _profile_map_x;
+
+public:
+    void register_query_profile();
+
+    // void add_profile(const std::string& iid, const InstanceProfilePtr profile) {
+    //     std::lock_guard<std::mutex> l(_profile_mutex);
+    //     _profile_map[iid] = profile;
+    // }
+
+    // Each pipelineX task will add its profile to the query context before it finishes.
+    void add_profile_pipeline_x(int fragment_id, bool finished,
+                                profile::TRuntimeProfilePtr profile) {
+        std::lock_guard<std::mutex> l(_profile_mutex);
+        // 重复添加怎么办
+        _profile_map_x[fragment_id].first = finished;
+        _profile_map_x[fragment_id].second.push_back(profile);
+    }
+
+    void add_fragment_profile_x(int fragment_id, bool finished,
+                                const std::vector<profile::TRuntimeProfilePtr>& pipeline_profile);
 };
 
 } // namespace doris

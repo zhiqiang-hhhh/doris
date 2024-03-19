@@ -109,6 +109,7 @@ import org.apache.doris.thrift.TScanRange;
 import org.apache.doris.thrift.TScanRangeLocation;
 import org.apache.doris.thrift.TScanRangeLocations;
 import org.apache.doris.thrift.TScanRangeParams;
+import org.apache.doris.thrift.TSendStatsRequest;
 import org.apache.doris.thrift.TStatusCode;
 import org.apache.doris.thrift.TTabletCommitInfo;
 import org.apache.doris.thrift.TUniqueId;
@@ -887,13 +888,13 @@ public class Coordinator implements CoordInterface {
             // TableValuedFunctionScanNode, we should ensure TableValuedFunctionScanNode does not
             // send data until ExchangeNode is ready to receive.
             boolean twoPhaseExecution = fragments.size() >= 2;
-            for (PlanFragment fragment : fragments) {
-                FragmentExecParams params = fragmentExecParamsMap.get(fragment.getFragmentId());
+            for (PlanFragment planFragment : fragments) {
+                FragmentExecParams execFragment = fragmentExecParamsMap.get(planFragment.getFragmentId());
 
                 // 1. set up exec states
-                int instanceNum = params.instanceExecParams.size();
+                int instanceNum = execFragment.instanceExecParams.size();
                 Preconditions.checkState(instanceNum > 0);
-                Map<TNetworkAddress, TPipelineFragmentParams> tParams = params.toTPipelineParams(backendIdx);
+                Map<TNetworkAddress, TPipelineFragmentParams> thriftFragment = execFragment.toTPipelineParams(backendIdx);
 
                 boolean needCheckBackendState = false;
                 if (queryOptions.getQueryType() == TQueryType.LOAD && profileFragmentId == 0) {
@@ -904,7 +905,7 @@ public class Coordinator implements CoordInterface {
                 }
 
                 Map<TUniqueId, Boolean> fragmentInstancesMap = new HashMap<TUniqueId, Boolean>();
-                for (Map.Entry<TNetworkAddress, TPipelineFragmentParams> entry : tParams.entrySet()) {
+                for (Map.Entry<TNetworkAddress, TPipelineFragmentParams> entry : thriftFragment.entrySet()) {
                     for (TPipelineInstanceParams instanceParam : entry.getValue().local_params) {
                         fragmentInstancesMap.put(instanceParam.fragment_instance_id, false);
                     }
@@ -913,10 +914,10 @@ public class Coordinator implements CoordInterface {
                 int numBackendsWithSink = 0;
                 // 3. group PipelineExecContext by BE.
                 // So that we can use one RPC to send all fragment instances of a BE.
-                for (Map.Entry<TNetworkAddress, TPipelineFragmentParams> entry : tParams.entrySet()) {
+                for (Map.Entry<TNetworkAddress, TPipelineFragmentParams> entry : thriftFragment.entrySet()) {
                     Long backendId = this.addressToBackendID.get(entry.getKey());
-                    backendFragments.add(Pair.of(fragment.getFragmentId(), backendId));
-                    PipelineExecContext pipelineExecContext = new PipelineExecContext(fragment.getFragmentId(),
+                    backendFragments.add(Pair.of(planFragment.getFragmentId(), backendId));
+                    PipelineExecContext pipelineExecContext = new PipelineExecContext(planFragment.getFragmentId(),
                             entry.getValue(), backendId, fragmentInstancesMap,
                             this.enablePipelineXEngine);
                     // Each tParam will set the total number of Fragments that need to be executed on the same BE,
@@ -925,14 +926,14 @@ public class Coordinator implements CoordInterface {
                     entry.getValue().setFragmentNumOnHost(hostCounter.count(pipelineExecContext.address));
                     entry.getValue().setBackendId(pipelineExecContext.backend.getId());
                     entry.getValue().setNeedWaitExecutionTrigger(twoPhaseExecution);
-                    entry.getValue().setFragmentId(fragment.getFragmentId().asInt());
+                    entry.getValue().setFragmentId(planFragment.getFragmentId().asInt());
 
-                    pipelineExecContexts.put(Pair.of(fragment.getFragmentId().asInt(), backendId), pipelineExecContext);
+                    pipelineExecContexts.put(Pair.of(planFragment.getFragmentId().asInt(), backendId), pipelineExecContext);
                     if (needCheckBackendState) {
                         needCheckPipelineExecContexts.add(pipelineExecContext);
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("add need check backend {} for fragment, {} job: {}",
-                                    pipelineExecContext.backend.getId(), fragment.getFragmentId().asInt(), jobId);
+                                    pipelineExecContext.backend.getId(), planFragment.getFragmentId().asInt(), jobId);
                         }
                     }
 
@@ -956,7 +957,7 @@ public class Coordinator implements CoordInterface {
                 if (ConnectContext.get() != null && ConnectContext.get().getSessionVariable() != null) {
                     loadStreamPerNode = ConnectContext.get().getSessionVariable().getLoadStreamPerNode();
                 }
-                for (Map.Entry<TNetworkAddress, TPipelineFragmentParams> entry : tParams.entrySet()) {
+                for (Map.Entry<TNetworkAddress, TPipelineFragmentParams> entry : thriftFragment.entrySet()) {
                     if (entry.getValue().getFragment().getOutputSink() != null
                             && entry.getValue().getFragment().getOutputSink().getType()
                             == TDataSinkType.OLAP_TABLE_SINK) {
@@ -2426,8 +2427,6 @@ public class Coordinator implements CoordInterface {
         // TODO: more ranges?
     }
 
-
-
     // update job progress from BE
     public void updateFragmentExecStatus(TReportExecStatusParams params) {
         if (enablePipelineXEngine) {
@@ -3879,4 +3878,3 @@ public class Coordinator implements CoordInterface {
         }
     }
 }
-

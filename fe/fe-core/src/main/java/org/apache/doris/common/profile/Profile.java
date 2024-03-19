@@ -58,11 +58,11 @@ public class Profile {
 
     private int profileLevel = 3;
 
-    public Profile(String name, boolean isEnable, int profileLevel, boolean isPipelineX) {
+    public Profile(String name, int profileLevel, boolean isPipelineX) {
         this.rootProfile = new RuntimeProfile(name);
         this.summaryProfile = new SummaryProfile(rootProfile);
         // if disabled, just set isFinished to true, so that update() will do nothing
-        this.isFinished = !isEnable;
+        this.isFinished = false;
         this.profileLevel = profileLevel;
         this.rootProfile.setIsPipelineX(isPipelineX);
     }
@@ -121,6 +121,10 @@ public class Profile {
 
     public SummaryProfile getSummaryProfile() {
         return summaryProfile;
+    }
+
+    public ExecutionProfile getExecutionProfile() {
+        return executionProfile;
     }
 
     public String getProfileByLevel() {
