@@ -41,7 +41,6 @@
 #include "vec/exprs/vexpr.h"
 #include "vec/exprs/vexpr_context.h"
 #include "vec/jsonb/serialize.h"
-#include "vec/sink/vmysql_result_writer.cpp"
 #include "vec/sink/vmysql_result_writer.h"
 
 namespace doris {
@@ -92,12 +91,14 @@ std::unique_ptr<vectorized::Block> Reusable::get_block() {
 
 void Reusable::return_block(std::unique_ptr<vectorized::Block>& block) {
     std::lock_guard lock(_block_mutex);
-    if (_block_pool.size() > s_preallocted_blocks_num) {
+    if (block == nullptr) {
         return;
     }
     block->clear_column_data();
     _block_pool.push_back(std::move(block));
-    _block_pool.resize(s_preallocted_blocks_num);
+    if (_block_pool.size() > s_preallocted_blocks_num) {
+        _block_pool.resize(s_preallocted_blocks_num);
+    }
 }
 
 int64_t Reusable::mem_size() const {

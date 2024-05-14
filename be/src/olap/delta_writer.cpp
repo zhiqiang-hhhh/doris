@@ -175,6 +175,7 @@ Status DeltaWriter::init() {
         } else {
             RETURN_IF_ERROR(_tablet->all_rs_id(_cur_max_version, &_rowset_ids));
         }
+        _rowset_ptrs = _tablet->get_rowset_by_ids(&_rowset_ids);
     }
 
     // check tablet version number
@@ -217,7 +218,7 @@ Status DeltaWriter::init() {
     context.tablet = _tablet;
     context.write_type = DataWriteType::TYPE_DIRECT;
     context.mow_context = std::make_shared<MowContext>(_cur_max_version, _req.txn_id, _rowset_ids,
-                                                       _delete_bitmap);
+                                                       _rowset_ptrs, _delete_bitmap);
     context.partial_update_info = _partial_update_info;
     RETURN_IF_ERROR(_tablet->create_rowset_writer(context, &_rowset_writer));
 
@@ -236,13 +237,8 @@ Status DeltaWriter::init() {
     return Status::OK();
 }
 
-Status DeltaWriter::append(const vectorized::Block* block) {
-    return write(block, {}, true);
-}
-
-Status DeltaWriter::write(const vectorized::Block* block, const std::vector<int>& row_idxs,
-                          bool is_append) {
-    if (UNLIKELY(row_idxs.empty() && !is_append)) {
+Status DeltaWriter::write(const vectorized::Block* block, const std::vector<int>& row_idxs) {
+    if (UNLIKELY(row_idxs.empty())) {
         return Status::OK();
     }
     _lock_watch.start();
@@ -262,12 +258,8 @@ Status DeltaWriter::write(const vectorized::Block* block, const std::vector<int>
                 _req.load_id.hi(), _req.load_id.lo(), _req.txn_id);
     }
 
-    if (is_append) {
-        _total_received_rows += block->rows();
-    } else {
-        _total_received_rows += row_idxs.size();
-    }
-    _mem_table->insert(block, row_idxs, is_append);
+    _total_received_rows += row_idxs.size();
+    _mem_table->insert(block, row_idxs);
 
     if (UNLIKELY(_mem_table->need_agg() && config::enable_shrink_memory)) {
         _mem_table->shrink_memtable_by_agg();
@@ -363,7 +355,7 @@ void DeltaWriter::_reset_mem_table() {
         _mem_table_flush_trackers.push_back(mem_table_flush_tracker);
     }
     auto mow_context = std::make_shared<MowContext>(_cur_max_version, _req.txn_id, _rowset_ids,
-                                                    _delete_bitmap);
+                                                    _rowset_ptrs, _delete_bitmap);
     _mem_table.reset(new MemTable(_tablet, _schema.get(), _tablet_schema.get(), _req.slots,
                                   _req.tuple_desc, _rowset_writer.get(), mow_context,
                                   _partial_update_info.get(), mem_table_insert_tracker,
@@ -651,7 +643,8 @@ void DeltaWriter::_build_current_tablet_schema(int64_t index_id,
     _partial_update_info = std::make_shared<PartialUpdateInfo>();
     _partial_update_info->init(*_tablet_schema, table_schema_param->is_partial_update(),
                                table_schema_param->partial_update_input_columns(),
-                               table_schema_param->is_strict_mode());
+                               table_schema_param->is_strict_mode(),
+                               table_schema_param->timestamp_ms(), table_schema_param->timezone());
 }
 
 void DeltaWriter::_request_slave_tablet_pull_rowset(PNodeInfo node_info) {

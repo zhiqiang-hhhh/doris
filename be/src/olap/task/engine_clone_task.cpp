@@ -148,7 +148,6 @@ EngineCloneTask::EngineCloneTask(const TCloneReq& clone_req, const TMasterInfo& 
 
 Status EngineCloneTask::execute() {
     // register the tablet to avoid it is deleted by gc thread during clone process
-    SCOPED_ATTACH_TASK(_mem_tracker);
     if (!StorageEngine::instance()->tablet_manager()->register_clone_tablet(_clone_req.tablet_id)) {
         return Status::InternalError("tablet {} is under clone", _clone_req.tablet_id);
     }
@@ -250,7 +249,7 @@ Status EngineCloneTask::_do_clone() {
         DataDir* store = nullptr;
         RETURN_IF_ERROR(StorageEngine::instance()->obtain_shard_path(
                 _clone_req.storage_medium, _clone_req.dest_path_hash, &local_shard_root_path,
-                &store));
+                &store, _clone_req.partition_id));
         auto tablet_dir = fmt::format("{}/{}/{}", local_shard_root_path, _clone_req.tablet_id,
                                       _clone_req.schema_hash);
 

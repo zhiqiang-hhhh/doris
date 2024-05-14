@@ -60,11 +60,13 @@ import org.apache.doris.plugin.AuditEvent.EventType;
 import org.apache.doris.proto.Data;
 import org.apache.doris.qe.QueryState.MysqlStateType;
 import org.apache.doris.service.FrontendOptions;
+import org.apache.doris.thrift.TExprNode;
 import org.apache.doris.thrift.TMasterOpRequest;
 import org.apache.doris.thrift.TMasterOpResult;
 import org.apache.doris.thrift.TUniqueId;
 
 import com.google.common.base.Strings;
+import com.google.common.collect.Maps;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.SpanKind;
@@ -74,6 +76,7 @@ import io.opentelemetry.context.propagation.TextMapGetter;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.thrift.TException;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -219,44 +222,35 @@ public class ConnectProcessor {
         packetBuf.get();
         // iteration_count always 1,
         packetBuf.getInt();
-        LOG.debug("execute prepared statement {}", stmtId);
         PrepareStmtContext prepareCtx = ctx.getPreparedStmt(String.valueOf(stmtId));
-        if (prepareCtx == null) {
-            LOG.debug("No such statement in context, stmtId:{}", stmtId);
-            ctx.getState().setError(ErrorCode.ERR_UNKNOWN_COM_ERROR,
-                    "msg: Not supported such prepared statement");
-            return;
-        }
-        ctx.setStartTime();
-        if (prepareCtx.stmt.getInnerStmt() instanceof QueryStmt) {
-            ctx.getState().setIsQuery(true);
-        }
-        prepareCtx.stmt.setIsPrepared();
         int paramCount = prepareCtx.stmt.getParmCount();
+        LOG.debug("execute prepared statement {}, paramCount {}", stmtId, paramCount);
         // null bitmap
-        byte[] nullbitmapData = new byte[(paramCount + 7) / 8];
-        packetBuf.get(nullbitmapData);
         String stmtStr = "";
         try {
-            // new_params_bind_flag
-            if ((int) packetBuf.get() != 0) {
-                // parse params's types
-                for (int i = 0; i < paramCount; ++i) {
-                    int typeCode = packetBuf.getChar();
-                    LOG.debug("code {}", typeCode);
-                    prepareCtx.stmt.placeholders().get(i).setTypeCode(typeCode);
-                }
-            }
             List<LiteralExpr> realValueExprs = new ArrayList<>();
-            // parse param data
-            for (int i = 0; i < paramCount; ++i) {
-                if (isNull(nullbitmapData, i)) {
-                    realValueExprs.add(new NullLiteral());
-                    continue;
+            if (paramCount > 0) {
+                byte[] nullbitmapData = new byte[(paramCount + 7) / 8];
+                packetBuf.get(nullbitmapData);
+                // new_params_bind_flag
+                if ((int) packetBuf.get() != 0) {
+                    // parse params's types
+                    for (int i = 0; i < paramCount; ++i) {
+                        int typeCode = packetBuf.getChar();
+                        LOG.debug("code {}", typeCode);
+                        prepareCtx.stmt.placeholders().get(i).setTypeCode(typeCode);
+                    }
                 }
-                LiteralExpr l = prepareCtx.stmt.placeholders().get(i).createLiteralFromType();
-                l.setupParamFromBinary(packetBuf);
-                realValueExprs.add(l);
+                // parse param data
+                for (int i = 0; i < paramCount; ++i) {
+                    if (isNull(nullbitmapData, i)) {
+                        realValueExprs.add(new NullLiteral());
+                        continue;
+                    }
+                    LiteralExpr l = prepareCtx.stmt.placeholders().get(i).createLiteralFromType();
+                    l.setupParamFromBinary(packetBuf);
+                    realValueExprs.add(l);
+                }
             }
             ExecuteStmt executeStmt = new ExecuteStmt(String.valueOf(stmtId), realValueExprs);
             // TODO set real origin statement
@@ -568,7 +562,6 @@ public class ConnectProcessor {
         LOG.debug("handle command {}", command);
         ctx.setCommand(command);
         ctx.setStartTime();
-
         switch (command) {
             case COM_INIT_DB:
                 handleInitDb();
@@ -642,17 +635,16 @@ public class ConnectProcessor {
             } else {
                 executor.sendResultSet(resultSet);
                 packet = getResultPacket();
-                if (packet == null) {
-                    LOG.debug("packet == null");
-                    return;
-                }
             }
         } else {
             packet = getResultPacket();
-            if (packet == null) {
+        }
+
+        if (packet == null) {
+            if (LOG.isDebugEnabled()) {
                 LOG.debug("packet == null");
-                return;
             }
+            return;
         }
 
         MysqlChannel channel = ctx.getMysqlChannel();
@@ -672,7 +664,7 @@ public class ConnectProcessor {
         }
     }
 
-    public TMasterOpResult proxyExecute(TMasterOpRequest request) {
+    public TMasterOpResult proxyExecute(TMasterOpRequest request) throws TException {
         ctx.setDatabase(request.db);
         ctx.setQualifiedUser(request.user);
         ctx.setEnv(Env.getCurrentEnv());
@@ -729,6 +721,9 @@ public class ConnectProcessor {
                 ctx.getSessionVariable().setQueryTimeoutS(request.getQueryTimeout());
             }
         }
+        if (request.isSetUserVariables()) {
+            ctx.setUserVars(userVariableFromThrift(request.getUserVariables()));
+        }
 
         Map<String, String> traceCarrier = new HashMap<>();
         if (request.isSetTraceCarrier()) {
@@ -744,7 +739,6 @@ public class ConnectProcessor {
         if (Span.fromContext(extractedContext).getSpanContext().isValid()) {
             ctx.initTracer("master trace");
         }
-
         ctx.setThreadLocalInfo();
         StmtExecutor executor = null;
         try {
@@ -863,6 +857,20 @@ public class ConnectProcessor {
                 ctx.setKilled();
                 break;
             }
+        }
+    }
+
+    private Map<String, LiteralExpr> userVariableFromThrift(Map<String, TExprNode> thriftMap) throws TException {
+        try {
+            Map<String, LiteralExpr> userVariables = Maps.newHashMap();
+            for (Map.Entry<String, TExprNode> entry : thriftMap.entrySet()) {
+                TExprNode tExprNode = entry.getValue();
+                LiteralExpr literalExpr = LiteralExpr.getLiteralExprFromThrift(tExprNode);
+                userVariables.put(entry.getKey(), literalExpr);
+            }
+            return userVariables;
+        } catch (AnalysisException e) {
+            throw new TException(e.getMessage());
         }
     }
 }

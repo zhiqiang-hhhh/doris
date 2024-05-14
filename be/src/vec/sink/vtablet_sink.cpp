@@ -525,7 +525,7 @@ Status VNodeChannel::open_wait() {
     return status;
 }
 
-Status VNodeChannel::add_block(vectorized::Block* block, const Payload* payload, bool is_append) {
+Status VNodeChannel::add_block(vectorized::Block* block, const Payload* payload) {
     SCOPED_CONSUME_MEM_TRACKER(_node_channel_tracker.get());
     if (payload->second.empty()) {
         return Status::OK();
@@ -604,29 +604,12 @@ Status VNodeChannel::add_block(vectorized::Block* block, const Payload* payload,
     }
 
     SCOPED_RAW_TIMER(&_stat.append_node_channel_ns);
-    if (is_append) {
-        // Do not split the data of the block by tablets but append it to a single delta writer.
-        // This is a faster way to send block than append_block_by_selector
-        // TODO: we could write to local delta writer if single_replica_load is true
-        VLOG_DEBUG << "send whole block by append block";
-        std::vector<int64_t> tablets(block->rows(), payload->second[0]);
-        vectorized::MutableColumns& columns = _cur_mutable_block->mutable_columns();
-        columns.clear();
-        columns.reserve(block->columns());
-        // Hold the reference of block columns to avoid copying
-        for (auto column : block->get_columns()) {
-            columns.push_back(column->assume_mutable());
-        }
-        *_cur_add_block_request.mutable_tablet_ids() = {tablets.begin(), tablets.end()};
-        _cur_add_block_request.set_is_single_tablet_block(true);
-    } else {
-        block->append_block_by_selector(_cur_mutable_block.get(), *(payload->first));
-        for (auto tablet_id : payload->second) {
-            _cur_add_block_request.add_tablet_ids(tablet_id);
-        }
+    block->append_block_by_selector(_cur_mutable_block.get(), *(payload->first));
+    for (auto tablet_id : payload->second) {
+        _cur_add_block_request.add_tablet_ids(tablet_id);
     }
 
-    if (is_append || _cur_mutable_block->rows() >= _batch_size ||
+    if (_cur_mutable_block->rows() >= _batch_size ||
         _cur_mutable_block->bytes() > config::doris_scanner_row_bytes) {
         {
             SCOPED_ATOMIC_TIMER(&_queue_push_lock_ns);
@@ -1019,6 +1002,8 @@ Status VOlapTableSink::prepare(RuntimeState* state) {
     RETURN_IF_ERROR(DataSink::prepare(state));
 
     _state = state;
+    _schema->set_timestamp_ms(_state->timestamp_ms());
+    _schema->set_timezone(_state->timezone());
 
     _sender_id = state->per_fragment_instance_idx();
     _num_senders = state->num_per_fragment_instances();
@@ -1395,6 +1380,7 @@ Status VOlapTableSink::send(RuntimeState* state, vectorized::Block* input_block,
             uint32_t tablet_index = 0;
             RETURN_IF_ERROR(find_tablet(state, &block, i, &partition, tablet_index, stop_processing,
                                         is_continue));
+
             if (is_continue) {
                 continue;
             }
@@ -1403,36 +1389,13 @@ Status VOlapTableSink::send(RuntimeState* state, vectorized::Block* input_block,
         }
     }
     _row_distribution_watch.stop();
-    // Random distribution and the block belongs to a single tablet, we could optimize to append the whole
-    // block into node channel.
-    bool load_block_to_single_tablet =
-            !_schema->is_dynamic_schema() && _partition_to_tablet_map.size() == 1;
-    if (load_block_to_single_tablet) {
-        SCOPED_RAW_TIMER(&_filter_ns);
-        // clear and release the references of columns
-        input_block->clear();
-        // Filter block
-        if (filtered_rows > 0) {
-            auto filter = vectorized::ColumnUInt8::create(block.rows(), 0);
-            vectorized::UInt8* filter_data =
-                    static_cast<vectorized::ColumnUInt8*>(filter.get())->get_data().data();
-            vectorized::IColumn::Filter& filter_col =
-                    static_cast<vectorized::ColumnUInt8*>(filter.get())->get_data();
-            for (size_t i = 0; i < filter_col.size(); ++i) {
-                filter_data[i] = !_filter_bitmap[i];
-            }
-            RETURN_IF_CATCH_EXCEPTION(
-                    vectorized::Block::filter_block_internal(&block, filter_col, block.columns()));
-        }
-    }
     // Add block to node channel
     for (size_t i = 0; i < _channels.size(); i++) {
         for (const auto& entry : channel_to_payload[i]) {
             // if this node channel is already failed, this add_row will be skipped
             auto st = entry.first->add_block(
-                    &block, &entry.second,
                     // if it is load single tablet, then append this whole block
-                    load_block_to_single_tablet);
+                    &block, &entry.second);
             if (!st.ok()) {
                 _channels[i]->mark_as_failed(entry.first, st.to_string());
             }

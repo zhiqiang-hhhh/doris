@@ -377,4 +377,30 @@ public class NereidsParserTest extends ParserTestBase {
             Assertions.assertEquals(6, decimalV2Type.getScale());
         }
     }
+
+    @Test
+    void testParseExprDepthWidth() {
+        String sql = "SELECT 1+2 = 3 from t";
+        NereidsParser nereidsParser = new NereidsParser();
+        LogicalPlan logicalPlan = (LogicalPlan) nereidsParser.parseSingle(sql).child(0);
+        System.out.println(logicalPlan);
+        // alias (1 + 2 = 3)
+        Assertions.assertEquals(4, logicalPlan.getExpressions().get(0).getDepth());
+        Assertions.assertEquals(3, logicalPlan.getExpressions().get(0).getWidth());
+    }
+
+    @Test
+    public void testParseBinaryKeyword() {
+        String sql = "SELECT BINARY 'abc' FROM t";
+        NereidsParser nereidsParser = new NereidsParser();
+        nereidsParser.parseSingle(sql);
+    }
+
+    @Test
+    public void testParseReserveKeyword() {
+        // partitions and auto_increment are reserve keywords
+        String sql = "SELECT BINARY 'abc' FROM information_schema.partitions order by AUTO_INCREMENT";
+        NereidsParser nereidsParser = new NereidsParser();
+        nereidsParser.parseSingle(sql);
+    }
 }

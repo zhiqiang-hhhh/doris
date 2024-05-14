@@ -45,6 +45,7 @@ import org.apache.doris.catalog.ArrayType;
 import org.apache.doris.catalog.MapType;
 import org.apache.doris.catalog.StructField;
 import org.apache.doris.catalog.StructType;
+import org.apache.doris.catalog.TableIf.TableType;
 import org.apache.doris.catalog.View;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.FeConstants;
@@ -340,6 +341,7 @@ terminal String
     KW_DESC,
     KW_DESCRIBE,
     KW_DIAGNOSE,
+    KW_DIAGNOSIS,
     KW_DISK,
     KW_DISTINCT,
     KW_DISTINCTPC,
@@ -350,6 +352,7 @@ terminal String
     KW_DOUBLE,
     KW_DROP,
     KW_DROPP,
+    KW_DUAL,
     KW_DUPLICATE,
     KW_DYNAMIC,
     KW_ELSE,
@@ -632,6 +635,7 @@ terminal String
     KW_VERBOSE,
     KW_VERSION,
     KW_VIEW,
+    KW_VIEWS,
     KW_WARNINGS,
     KW_WEEK,
     KW_WHEN,
@@ -1156,7 +1160,11 @@ stmt ::=
     | insert_overwrite_stmt : stmt
     {: RESULT = stmt; :}
     | update_stmt : stmt
-    {: RESULT = stmt; :}
+    {:
+        RESULT = stmt;
+        stmt.setPlaceHolders(parser.placeholder_expr_list);
+        parser.placeholder_expr_list.clear();
+    :}
     | backup_stmt : stmt
     {: RESULT = stmt; :}
     | restore_stmt : stmt
@@ -3789,6 +3797,16 @@ show_param ::=
     {:
         RESULT = new ShowTableStmt(db, ctl, parser.isVerbose, parser.wild, parser.where);
     :}
+    /* show views */
+    | opt_full KW_VIEWS opt_db:db opt_wild_where
+    {:
+        RESULT = new ShowTableStmt(db, null, parser.isVerbose, TableType.VIEW, parser.wild, parser.where);
+    :}
+    /* show views */
+    | opt_full KW_VIEWS from_or_in ident:ctl DOT ident:db opt_wild_where
+    {:
+        RESULT = new ShowTableStmt(db, ctl, parser.isVerbose, TableType.VIEW, parser.wild, parser.where);
+    :}
     /* show table id */
     | KW_TABLE INTEGER_LITERAL:tableId
     {:
@@ -4212,6 +4230,30 @@ show_param ::=
     {:
         RESULT = new ShowConvertLSCStmt(db);
     :}
+    | KW_REPLICA KW_STATUS KW_FROM base_table_ref:table_ref opt_wild_where
+    {:
+        RESULT = new ShowReplicaStatusStmt(table_ref, parser.where);
+    :}
+    | KW_REPLICA KW_DISTRIBUTION KW_FROM base_table_ref:table_ref
+    {:
+        RESULT = new ShowReplicaDistributionStmt(table_ref);
+    :}
+    | KW_FRONTEND KW_CONFIG opt_wild_where
+    {:
+        RESULT = new ShowConfigStmt(AdminSetConfigStmt.ConfigType.FRONTEND, parser.wild);
+    :}
+    | KW_TABLET KW_STORAGE KW_FORMAT
+    {:
+        RESULT = new ShowTabletStorageFormatStmt(false);
+    :}
+    | KW_TABLET KW_STORAGE KW_FORMAT KW_VERBOSE
+    {:
+        RESULT = new ShowTabletStorageFormatStmt(true);
+    :}
+    | KW_TABLET KW_DIAGNOSIS INTEGER_LITERAL:tabletId
+    {:
+        RESULT = new DiagnoseTabletStmt(tabletId);
+    :}
     ;
 
 opt_tmp ::=
@@ -4478,7 +4520,7 @@ cancel_param ::=
 
 // Delete stmt
 delete_stmt ::=
-    KW_DELETE KW_FROM table_name:table opt_table_alias:alias opt_partition_names:partitionNames opt_using_clause:fromClause where_clause:wherePredicate
+    KW_DELETE KW_FROM table_name:table opt_partition_names:partitionNames opt_table_alias:alias opt_using_clause:fromClause where_clause:wherePredicate
     {:
         RESULT = new DeleteStmt(new TableRef(table, alias), partitionNames, fromClause, wherePredicate);
     :}
@@ -5303,7 +5345,7 @@ expr_or_default ::=
 prepare_stmt ::=
     KW_PREPARE variable_name:name KW_FROM select_stmt:s
     {:
-        RESULT = new PrepareStmt(s, name, false);
+        RESULT = new PrepareStmt(s, name);
         s.setPlaceHolders(parser.placeholder_expr_list);
         parser.placeholder_expr_list.clear();
     :}
@@ -5586,6 +5628,8 @@ type_function_name ::=
 from_clause ::=
     KW_FROM table_ref_list:l
     {: RESULT = new FromClause(l); :}
+    | KW_FROM KW_DUAL
+    {: RESULT = null; :}
     ;
 
 table_ref_list ::=
@@ -7170,13 +7214,15 @@ integer_list ::=
     ;
 
 admin_stmt ::=
+    // deprecated
     KW_ADMIN KW_SHOW KW_REPLICA KW_STATUS KW_FROM base_table_ref:table_ref opt_wild_where
     {:
-        RESULT = new AdminShowReplicaStatusStmt(table_ref, parser.where);
+        RESULT = new ShowReplicaStatusStmt(table_ref, parser.where);
     :}
+    // deprecated
     | KW_ADMIN KW_SHOW KW_REPLICA KW_DISTRIBUTION KW_FROM base_table_ref:table_ref
     {:
-        RESULT = new AdminShowReplicaDistributionStmt(table_ref);
+        RESULT = new ShowReplicaDistributionStmt(table_ref);
     :}
     | KW_ADMIN KW_SET KW_REPLICA KW_STATUS KW_PROPERTIES LPAREN key_value_map:prop RPAREN
     {:
@@ -7196,11 +7242,20 @@ admin_stmt ::=
     :}
     | KW_ADMIN KW_SET KW_FRONTEND KW_CONFIG opt_key_value_map:configs
     {:
-        RESULT = new AdminSetConfigStmt(AdminSetConfigStmt.ConfigType.FRONTEND, configs);
+        RESULT = new AdminSetConfigStmt(AdminSetConfigStmt.ConfigType.FRONTEND, configs, false);
     :}
+    | KW_ADMIN KW_SET KW_ALL KW_FRONTENDS KW_CONFIG opt_key_value_map:configs
+    {:
+        RESULT = new AdminSetConfigStmt(AdminSetConfigStmt.ConfigType.FRONTEND, configs, true);
+    :}
+    | KW_ADMIN KW_SET KW_FRONTEND KW_CONFIG opt_key_value_map:configs KW_ALL
+    {:
+        RESULT = new AdminSetConfigStmt(AdminSetConfigStmt.ConfigType.FRONTEND, configs, true);
+    :}
+    // deprecated
     | KW_ADMIN KW_SHOW KW_FRONTEND KW_CONFIG opt_wild_where
     {:
-        RESULT = new AdminShowConfigStmt(AdminSetConfigStmt.ConfigType.FRONTEND, parser.wild);
+        RESULT = new ShowConfigStmt(AdminSetConfigStmt.ConfigType.FRONTEND, parser.wild);
     :}
     | KW_ADMIN KW_CHECK KW_TABLET LPAREN integer_list:tabletIds RPAREN opt_properties:properties
     {:
@@ -7230,17 +7285,20 @@ admin_stmt ::=
     {:
         RESULT = new AdminCleanTrashStmt(null);
     :}
+    // deprecated
     | KW_ADMIN KW_DIAGNOSE KW_TABLET INTEGER_LITERAL:tabletId
     {:
-        RESULT = new AdminDiagnoseTabletStmt(tabletId);
+        RESULT = new DiagnoseTabletStmt(tabletId);
     :}
+    // deprecated
     | KW_ADMIN KW_SHOW KW_TABLET KW_STORAGE KW_FORMAT
     {:
-        RESULT = new AdminShowTabletStorageFormatStmt(false);
+        RESULT = new ShowTabletStorageFormatStmt(false);
     :}
+    // deprecated
     | KW_ADMIN KW_SHOW KW_TABLET KW_STORAGE KW_FORMAT KW_VERBOSE
     {:
-        RESULT = new AdminShowTabletStorageFormatStmt(true);
+        RESULT = new ShowTabletStorageFormatStmt(true);
     :}
     | KW_ADMIN KW_COPY KW_TABLET INTEGER_LITERAL:tabletId opt_properties:properties
     {:
@@ -7359,6 +7417,8 @@ keyword ::=
     {: RESULT = id; :}
     | KW_ARRAY:id
     {: RESULT = id; :}
+    | KW_AUTO_INCREMENT:id
+    {: RESULT = id; :}
     | KW_BACKUP:id
     {: RESULT = id; :}
     | KW_BEGIN:id
@@ -7458,6 +7518,8 @@ keyword ::=
     | KW_DECIMALV3:id
     {: RESULT = id; :}
     | KW_DIAGNOSE:id
+    {: RESULT = id; :}
+    | KW_DIAGNOSIS:id
     {: RESULT = id; :}
     | KW_DISTINCTPC:id
     {: RESULT = id; :}
@@ -7581,6 +7643,8 @@ keyword ::=
     {: RESULT = id; :}
     | KW_PARAMETER:id
     {: RESULT = id; :}
+    | KW_PARTITIONS:id
+    {: RESULT = id; :}
     | KW_PASSWORD:id
     {: RESULT = id; :}
     | KW_PASSWORD_EXPIRE:id
@@ -7702,6 +7766,8 @@ keyword ::=
     | KW_VERSION:id
     {: RESULT = id; :}
     | KW_VIEW:id
+    {: RESULT = id; :}
+    | KW_VIEWS:id
     {: RESULT = id; :}
     | KW_WARNINGS:id
     {: RESULT = id; :}

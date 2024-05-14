@@ -51,7 +51,7 @@ static const RE2 STARTS_WITH_RE(R"(\^([^\.\^\{\[\(\|\)\]\}\+\*\?\$\\]*)(?:\.\*)*
 // A regex to match any regex pattern which is equivalent to a constant string match.
 static const RE2 EQUALS_RE(R"(\^([^\.\^\{\[\(\|\)\]\}\+\*\?\$\\]*)\$)");
 // A regex to match .*
-static const RE2 ALLPASS_RE(R"((\\.\*)+)");
+static const RE2 ALLPASS_RE(R"((\.\*)+)");
 
 // Like patterns
 static const re2::RE2 LIKE_SUBSTRING_RE(R"((?:%+)(((\\_)|([^%_\\]))+)(?:%+))");
@@ -296,12 +296,10 @@ Status FunctionLikeBase::hs_prepare(FunctionContext* context, const char* expres
 
     if (res != HS_SUCCESS) {
         *database = nullptr;
-        if (context) {
-            context->set_error("hs_compile regex pattern error");
-        }
-        return Status::RuntimeError("hs_compile regex pattern error:" +
-                                    std::string(compile_err->message));
+        auto error_msg = fmt::format("hs_compile regex pattern={}, error msg={}", expression,
+                                     compile_err->message);
         hs_free_compile_error(compile_err);
+        return Status::RuntimeError(error_msg);
     }
     hs_free_compile_error(compile_err);
 
@@ -309,9 +307,6 @@ Status FunctionLikeBase::hs_prepare(FunctionContext* context, const char* expres
         hs_free_database(*database);
         *database = nullptr;
         *scratch = nullptr;
-        if (context) {
-            context->set_error("hs_alloc_scratch allocate scratch space error");
-        }
         return Status::RuntimeError("hs_alloc_scratch allocate scratch space error");
     }
 

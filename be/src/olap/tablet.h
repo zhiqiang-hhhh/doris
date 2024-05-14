@@ -73,6 +73,7 @@ class TupleDescriptor;
 class CalcDeleteBitmapToken;
 enum CompressKind : int;
 class RowsetBinlogMetasPB;
+struct TabletTxnInfo;
 
 namespace io {
 class RemoteFileSystem;
@@ -258,6 +259,12 @@ public:
         _last_base_compaction_schedule_millis = millis;
     }
 
+    void set_last_single_compaction_failure_status(std::string status) {
+        _last_single_compaction_failure_status = std::move(status);
+    }
+
+    void set_last_fetched_version(Version version) { _last_fetched_version = std::move(version); }
+
     void delete_all_files();
 
     void check_tablet_path_exists();
@@ -273,8 +280,9 @@ public:
     std::vector<RowsetSharedPtr> pick_candidate_rowsets_to_build_inverted_index(
             const std::set<int32_t>& alter_index_uids, bool is_drop_op);
 
-    std::vector<RowsetSharedPtr> pick_candidate_rowsets_to_single_replica_compaction();
-    std::vector<Version> get_all_versions();
+    // used for single compaction to get the local versions
+    // Single compaction does not require remote rowsets and cannot violate the cooldown semantics
+    std::vector<Version> get_all_local_versions();
 
     std::vector<RowsetSharedPtr> pick_first_consecutive_empty_rowsets(int limit);
 
@@ -329,6 +337,8 @@ public:
     }
 
     std::string get_last_base_compaction_status() { return _last_base_compaction_status; }
+
+    bool should_fetch_from_peer();
 
     inline bool all_beta() const {
         std::shared_lock rdlock(_meta_lock);
@@ -459,8 +469,8 @@ public:
                               DeleteBitmapPtr delete_bitmap, int64_t version,
                               CalcDeleteBitmapToken* token, RowsetWriter* rowset_writer = nullptr);
 
-    std::vector<RowsetSharedPtr> get_rowset_by_ids(const RowsetIdUnorderedSet* specified_rowset_ids,
-                                                   bool include_stale = false);
+    std::vector<RowsetSharedPtr> get_rowset_by_ids(
+            const RowsetIdUnorderedSet* specified_rowset_ids);
 
     Status calc_segment_delete_bitmap(RowsetSharedPtr rowset,
                                       const segment_v2::SegmentSharedPtr& seg,
@@ -493,10 +503,7 @@ public:
             const std::vector<segment_v2::SegmentSharedPtr>& segments, int64_t txn_id,
             CalcDeleteBitmapToken* token, RowsetWriter* rowset_writer = nullptr);
 
-    Status update_delete_bitmap(const RowsetSharedPtr& rowset,
-                                const RowsetIdUnorderedSet& pre_rowset_ids,
-                                DeleteBitmapPtr delete_bitmap, int64_t txn_id,
-                                RowsetWriter* rowset_writer = nullptr);
+    Status update_delete_bitmap(const TabletTxnInfo* txn_info, int64_t txn_id);
     void calc_compaction_output_rowset_delete_bitmap(
             const std::vector<RowsetSharedPtr>& input_rowsets,
             const RowIdConversion& rowid_conversion, uint64_t start_version, uint64_t end_version,
@@ -573,6 +580,8 @@ public:
     void set_alter_failed(bool alter_failed) { _alter_failed = alter_failed; }
     bool is_alter_failed() { return _alter_failed; }
 
+    void clear_cache();
+
 private:
     Status _init_once_action();
     void _print_missed_versions(const std::vector<Version>& missed_versions) const;
@@ -620,6 +629,8 @@ private:
 
     void _remove_sentinel_mark_from_delete_bitmap(DeleteBitmapPtr delete_bitmap);
     std::string _get_rowset_info_str(RowsetSharedPtr rowset, bool delete_flag);
+
+    void _clear_cache_by_rowset(const BetaRowsetSharedPtr& rowset);
 
 public:
     static const int64_t K_INVALID_CUMULATIVE_POINT = -1;
@@ -676,6 +687,10 @@ private:
     std::atomic<int32_t> _newly_created_rowset_num;
     std::atomic<int64_t> _last_checkpoint_time;
     std::string _last_base_compaction_status;
+
+    // single replica compaction status
+    std::string _last_single_compaction_failure_status;
+    Version _last_fetched_version;
 
     // cumulative compaction policy
     std::shared_ptr<CumulativeCompactionPolicy> _cumulative_compaction_policy;

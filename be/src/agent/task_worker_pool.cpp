@@ -352,6 +352,7 @@ void TaskWorkerPool::_alter_inverted_index_worker_thread_callback() {
                 alter_inverted_index_rq.tablet_id);
         if (tablet_ptr != nullptr) {
             EngineIndexChangeTask engine_task(alter_inverted_index_rq);
+            SCOPED_ATTACH_TASK(engine_task.mem_tracker());
             status = _env->storage_engine()->execute_task(&engine_task);
         } else {
             status =
@@ -587,6 +588,7 @@ void TaskWorkerPool::_check_consistency_worker_thread_callback() {
         EngineChecksumTask engine_task(check_consistency_req.tablet_id,
                                        check_consistency_req.schema_hash,
                                        check_consistency_req.version, &checksum);
+        SCOPED_ATTACH_TASK(engine_task.mem_tracker());
         Status status = _env->storage_engine()->execute_task(&engine_task);
         if (!status.ok()) {
             LOG_WARNING("failed to check consistency")
@@ -1194,6 +1196,7 @@ void TaskWorkerPool::_push_storage_policy_worker_thread_callback() {
                 S3Conf s3_conf;
                 s3_conf.ak = std::move(resource.s3_storage_param.ak);
                 s3_conf.sk = std::move(resource.s3_storage_param.sk);
+                s3_conf.token = std::move(resource.s3_storage_param.token);
                 s3_conf.endpoint = std::move(resource.s3_storage_param.endpoint);
                 s3_conf.region = std::move(resource.s3_storage_param.region);
                 s3_conf.prefix = std::move(resource.s3_storage_param.root_path);
@@ -1209,7 +1212,7 @@ void TaskWorkerPool::_push_storage_policy_worker_thread_callback() {
                     st = io::S3FileSystem::create(s3_conf, std::to_string(resource.id), &fs);
                 } else {
                     fs = std::static_pointer_cast<io::S3FileSystem>(existed_resource.fs);
-                    fs->set_conf(s3_conf);
+                    st = fs->set_conf(s3_conf);
                 }
                 if (!st.ok()) {
                     LOG(WARNING) << "update s3 resource failed: " << st;
@@ -1487,6 +1490,7 @@ void PushTaskPool::_push_worker_thread_callback() {
         std::vector<TTabletInfo> tablet_infos;
 
         EngineBatchLoadTask engine_task(push_req, &tablet_infos);
+        SCOPED_ATTACH_TASK(engine_task.mem_tracker());
         auto status = _env->storage_engine()->execute_task(&engine_task);
 
         // Return result to fe
@@ -1893,6 +1897,7 @@ void CloneTaskPool::_clone_worker_thread_callback() {
         std::vector<TTabletInfo> tablet_infos;
         EngineCloneTask engine_task(clone_req, _master_info, agent_task_req.signature,
                                     &tablet_infos);
+        SCOPED_ATTACH_TASK(engine_task.mem_tracker());
         auto status = _env->storage_engine()->execute_task(&engine_task);
         // Return result to fe
         TFinishTaskRequest finish_task_request;
@@ -2011,7 +2016,8 @@ Status StorageMediumMigrateTaskPool::_check_migrate_request(const TStorageMedium
                                          storage_medium);
         }
         // get a random store of specified storage medium
-        auto stores = StorageEngine::instance()->get_stores_for_create_tablet(storage_medium);
+        auto stores = StorageEngine::instance()->get_stores_for_create_tablet(
+                tablet->partition_id(), storage_medium);
         if (stores.empty()) {
             return Status::InternalError("failed to get root path for create tablet");
         }

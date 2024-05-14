@@ -46,6 +46,7 @@
 #include "olap/olap_define.h"
 #include "olap/olap_meta.h"
 #include "olap/pb_helper.h"
+#include "olap/rowset/beta_rowset.h"
 #include "olap/rowset/rowset.h"
 #include "olap/rowset/rowset_meta_manager.h"
 #include "olap/storage_engine.h"
@@ -552,18 +553,8 @@ Status TabletManager::_drop_tablet_unlocked(TTabletId tablet_id, TReplicaId repl
     _remove_tablet_from_partition(to_drop_tablet);
     tablet_map_t& tablet_map = _get_tablet_map(tablet_id);
     tablet_map.erase(tablet_id);
-    {
-        std::shared_lock rlock(to_drop_tablet->get_header_lock());
-        static auto recycle_segment_cache = [](const auto& rowset_map) {
-            for (auto& [_, rowset] : rowset_map) {
-                // If the tablet was deleted, it need to remove all rowsets fds directly
-                SegmentLoader::instance()->erase_segments(
-                        SegmentCache::CacheKey(rowset->rowset_id()));
-            }
-        };
-        recycle_segment_cache(to_drop_tablet->rowset_map());
-        recycle_segment_cache(to_drop_tablet->stale_rowset_map());
-    }
+    to_drop_tablet->clear_cache();
+
     if (!keep_files) {
         // drop tablet will update tablet meta, should lock
         std::lock_guard<std::shared_mutex> wrlock(to_drop_tablet->get_header_lock());
@@ -1144,6 +1135,9 @@ bool TabletManager::_move_tablet_to_trash(const TabletSharedPtr& tablet) {
                          << " cur tablet_uid=" << tablet_meta->tablet_uid();
             return true;
         }
+
+        tablet->clear_cache();
+
         // move data to trash
         const auto& tablet_path = tablet->tablet_path();
         bool exists = false;
@@ -1185,6 +1179,7 @@ bool TabletManager::_move_tablet_to_trash(const TabletSharedPtr& tablet) {
                   << ", schema_hash=" << tablet->schema_hash() << ", tablet_path=" << tablet_path;
         return true;
     } else {
+        tablet->clear_cache();
         // if could not find tablet info in meta store, then check if dir existed
         const auto& tablet_path = tablet->tablet_path();
         bool exists = false;

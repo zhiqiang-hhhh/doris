@@ -36,6 +36,7 @@ import org.apache.doris.common.util.RuntimeProfile;
 import org.apache.doris.common.util.TimeUtils;
 import org.apache.doris.load.loadv2.LoadJob;
 import org.apache.doris.metric.MetricRepo;
+import org.apache.doris.mysql.MysqlCommand;
 import org.apache.doris.nereids.stats.StatsErrorEstimator;
 import org.apache.doris.planner.DataPartition;
 import org.apache.doris.planner.DataSink;
@@ -373,6 +374,8 @@ public class Coordinator implements CoordInterface {
         this.queryOptions.setQueryTimeout(context.getExecTimeout());
         this.queryOptions.setExecutionTimeout(context.getExecTimeout());
         this.queryOptions.setEnableScanNodeRunSerial(context.getSessionVariable().isEnableScanRunSerial());
+        this.queryOptions.setMysqlRowBinaryFormat(
+                    context.getCommand() == MysqlCommand.COM_STMT_EXECUTE);
     }
 
     public long getJobId() {
@@ -1759,7 +1762,7 @@ public class Coordinator implements CoordInterface {
                             }
                             // if have limit and no conjuncts, only need 1 instance to save cpu and
                             // mem resource
-                            if (node.isPresent() && node.get().shouldUseOneInstance()) {
+                            if (node.isPresent() && node.get().shouldUseOneInstance(ConnectContext.get())) {
                                 expectedInstanceNum = 1;
                             }
 
@@ -1772,7 +1775,7 @@ public class Coordinator implements CoordInterface {
                             expectedInstanceNum = Math.max(expectedInstanceNum, 1);
                             // if have limit and conjuncts, only need 1 instance to save cpu and
                             // mem resource
-                            if (node.isPresent() && node.get().shouldUseOneInstance()) {
+                            if (node.isPresent() && node.get().shouldUseOneInstance(ConnectContext.get())) {
                                 expectedInstanceNum = 1;
                             }
 
@@ -3520,6 +3523,14 @@ public class Coordinator implements CoordInterface {
                         backendExecState.instanceProfile);
             }
         }
+    }
+
+    public Map<PlanFragmentId, FragmentExecParams> getFragmentExecParamsMap() {
+        return fragmentExecParamsMap;
+    }
+
+    public List<PlanFragment> getFragments() {
+        return fragments;
     }
 
     // Runtime filter target fragment instance param

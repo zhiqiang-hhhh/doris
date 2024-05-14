@@ -120,6 +120,9 @@ DECLARE_String(mem_limit);
 // Soft memory limit as a fraction of hard memory limit.
 DECLARE_Double(soft_mem_limit_frac);
 
+// Schema change memory limit as a fraction of soft memory limit.
+DECLARE_Double(schema_change_mem_limit_frac);
+
 // Many modern allocators (for example) do not do a mremap for
 // realloc, even in case of large enough chunks of memory. Although this allows
 // you to increase performance and reduce memory consumption during realloc.
@@ -479,7 +482,7 @@ DECLARE_mInt32(finished_migration_tasks_size);
 // If size less than this, the remaining rowsets will be force to complete
 DECLARE_mInt32(migration_remaining_size_threshold_mb);
 // If the task runs longer than this time, the task will be terminated, in seconds.
-// tablet max size / migration min speed * factor = 10GB / 1MBps * 2 = 20480 seconds
+// timeout = std::max(migration_task_timeout_secs,  tablet size / 1MB/s)
 DECLARE_mInt32(migration_task_timeout_secs);
 
 // Port to start debug webserver on
@@ -844,6 +847,13 @@ DECLARE_Int32(routine_load_consumer_pool_size);
 // if the size of batch is more than this threshold, we will request plans for all related tables.
 DECLARE_Int32(multi_table_batch_plan_threshold);
 
+// Used in single-stream-multi-table load. When receiving a batch of messages from Kafka,
+// if the size of the table wait for plan is more than this threshold, we will request plans for all related tables.
+// The param is aimed to avoid requesting and executing too many plans at once.
+// Performing small batch processing on multiple tables during the loaded process can reduce the pressure of a single RPC
+// and improve the real-time processing of data.
+DECLARE_Int32(multi_table_max_wait_tables);
+
 // When the timeout of a load task is less than this threshold,
 // Doris treats it as a high priority task.
 // high priority tasks use a separate thread pool for flush and do not block rpc by memory cleanup logic.
@@ -1197,6 +1207,16 @@ DECLARE_String(trino_connector_plugin_dir);
 
 // the file paths(one or more) of CA cert, splite using ";" aws s3 lib use it to init s3client
 DECLARE_mString(ca_cert_file_paths);
+
+// Number of open tries, default 1 means only try to open once.
+// Retry the Open num_retries time waiting 100 milliseconds between retries.
+DECLARE_mInt32(thrift_client_open_num_tries);
+
+// consider two high usage disk at the same available level if they do not exceed this diff.
+DECLARE_mDouble(high_disk_avail_level_diff_usages);
+
+// create tablet in partition random robin idx lru size, default 10000
+DECLARE_Int32(partition_disk_index_lru_size);
 
 #ifdef BE_TEST
 // test s3

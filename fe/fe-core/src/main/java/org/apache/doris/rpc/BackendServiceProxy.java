@@ -17,9 +17,9 @@
 
 package org.apache.doris.rpc;
 
+import org.apache.doris.catalog.Env;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.ThreadPoolManager;
-import org.apache.doris.common.util.NetUtils;
 import org.apache.doris.metric.MetricRepo;
 import org.apache.doris.proto.InternalService;
 import org.apache.doris.proto.InternalService.PExecPlanFragmentStartRequest;
@@ -107,7 +107,7 @@ public class BackendServiceProxy {
     }
 
     private BackendServiceClient getProxy(TNetworkAddress address) throws UnknownHostException {
-        String realIp = NetUtils.getIpByHost(address.getHostname());
+        String realIp = Env.getCurrentEnv().getDnsCache().get(address.hostname);
         BackendServiceClientExtIp serviceClientExtIp = serviceMap.get(address);
         if (serviceClientExtIp != null && serviceClientExtIp.realIp.equals(realIp)
                 && serviceClientExtIp.client.isNormalState()) {
@@ -267,6 +267,18 @@ public class BackendServiceProxy {
             return client.fetchDataSync(request);
         } catch (Throwable e) {
             LOG.warn("fetch data catch a exception, address={}:{}",
+                    address.getHostname(), address.getPort(), e);
+            throw new RpcException(address.hostname, e.getMessage());
+        }
+    }
+
+    public Future<InternalService.POutfileWriteSuccessResult> outfileWriteSuccessAsync(TNetworkAddress address,
+            InternalService.POutfileWriteSuccessRequest request)  throws RpcException {
+        try {
+            final BackendServiceClient client = getProxy(address);
+            return client.outfileWriteSuccessAsync(request);
+        } catch (Throwable e) {
+            LOG.warn("outfile write success file catch a exception, address={}:{}",
                     address.getHostname(), address.getPort(), e);
             throw new RpcException(address.hostname, e.getMessage());
         }

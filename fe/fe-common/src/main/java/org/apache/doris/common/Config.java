@@ -1412,6 +1412,14 @@ public class Config extends ConfigBase {
     public static int max_multi_partition_num = 4096;
 
     /**
+     * Use this parameter to set the partition name prefix for multi partition,
+     * Only multi partition takes effect, not dynamic partitions.
+     * The default prefix is "p".
+     */
+    @ConfField(mutable = true, masterOnly = true)
+    public static String multi_partition_name_prefix = "p";
+
+    /**
      * Control the max num of backup/restore job per db
      */
     @ConfField(mutable = true, masterOnly = true)
@@ -2027,7 +2035,13 @@ public class Config extends ConfigBase {
     public static boolean skip_localhost_auth_check  = true;
 
     @ConfField(mutable = true)
-    public static boolean enable_round_robin_create_tablet = false;
+    public static boolean enable_round_robin_create_tablet = true;
+
+    @ConfField(mutable = true, masterOnly = true, description = {
+        "创建分区时，总是从第一个 BE 开始创建。注意：这种方式可能造成BE不均衡",
+        "When creating tablet of a partition, always start from the first BE. "
+            + "Note: This method may cause BE imbalance"})
+    public static boolean create_tablet_round_robin_from_start = false;
 
     /**
      * To prevent different types (V1, V2, V3) of behavioral inconsistencies,
@@ -2130,6 +2144,16 @@ public class Config extends ConfigBase {
                     + "This config is recommended to be used only in the test environment"})
     public static int force_olap_table_replication_num = 0;
 
+    @ConfField(mutable = true, masterOnly = true, description = {
+            "用于强制设定内表的副本分布，如果该参数不为空，则用户在建表或者创建分区时指定的副本数及副本标签将被忽略，而使用本参数设置的值。"
+                    + "该参数影响包括创建分区、修改表属性、动态分区等操作。该参数建议仅用于测试环境",
+            "Used to force set the replica allocation of the internal table. If the config is not empty, "
+                    + "the replication_num and replication_allocation specified by the user when creating the table "
+                    + "or partitions will be ignored, and the value set by this parameter will be used."
+                    + "This config effect the operations including create tables, create partitions and create "
+                    + "dynamic partitions. This config is recommended to be used only in the test environment"})
+    public static String force_olap_table_replication_allocation = "";
+
     @ConfField
     public static long statistics_sql_mem_limit_in_bytes = 2L * 1024 * 1024 * 1024;
 
@@ -2193,11 +2217,17 @@ public class Config extends ConfigBase {
     })
     public static long analyze_record_limit = 20000;
 
-    @ConfField(description = {
+    @ConfField(mutable = true, description = {
             "Auto Buckets中最小的buckets数目",
             "min buckets of auto bucket"
     })
     public static int autobucket_min_buckets = 1;
+
+    @ConfField(mutable = true, description = {
+        "Auto Buckets中最大的buckets数目",
+        "max buckets of auto bucket"
+    })
+    public static int autobucket_max_buckets = 128;
 
     @ConfField
     public static int auto_analyze_simultaneously_running_task_num = 1;
@@ -2282,6 +2312,18 @@ public class Config extends ConfigBase {
             + "or too large package causing OOM,default 20000000(20M),set -1 for unlimited. "})
     public static int fe_thrift_max_pkg_bytes = 20000000;
 
+    @ConfField(mutable = true, masterOnly = true, description = {
+            "备份过程中，分配给每个be的upload任务最大个数，默认值为3个。",
+            "The max number of upload tasks assigned to each be during the backup process, the default value is 3."
+    })
+    public static int backup_upload_task_num_per_be = 3;
+
+    @ConfField(mutable = true, masterOnly = true, description = {
+            "恢复过程中，分配给每个be的download任务最大个数，默认值为3个。",
+            "The max number of download tasks assigned to each be during the restore process, the default value is 3."
+    })
+    public static int restore_download_task_num_per_be = 3;
+
     @ConfField(description = {"是否开启通过http接口获取log文件的功能",
             "Whether to enable the function of getting log files through http interface"})
     public static boolean enable_get_log_file_api = false;
@@ -2299,10 +2341,12 @@ public class Config extends ConfigBase {
     public static int http_load_submitter_max_worker_threads = 2;
 
     @ConfField(mutable = true, masterOnly = true, description = {
-            "load label个数阈值，超过该个数后，对于已经完成导入作业或者任务，其label会被删除，被删除的 label 可以被重用。",
+            "load label个数阈值，超过该个数后，对于已经完成导入作业或者任务，"
+            + "其label会被删除，被删除的 label 可以被重用。 值为 -1 时，表示此阈值不生效。",
             "The threshold of load labels' number. After this number is exceeded, "
                     + "the labels of the completed import jobs or tasks will be deleted, "
-                    + "and the deleted labels can be reused."
+                    + "and the deleted labels can be reused. "
+                    + "When the value is -1, it indicates no threshold."
     })
     public static int label_num_threshold = 2000;
 
@@ -2311,5 +2355,9 @@ public class Config extends ConfigBase {
             "Whether to enable proxy protocol"
     })
     public static boolean enable_proxy_protocol = false;
+
+    @ConfField(description = {"Stream_Load 导入时，label 被限制的最大长度",
+            "Stream_Load When importing, the maximum length of label is limited"})
+    public static int label_regex_length = 128;
 
 }

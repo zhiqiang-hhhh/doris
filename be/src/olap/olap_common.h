@@ -39,6 +39,8 @@
 
 namespace doris {
 
+class Rowset;
+
 static constexpr int64_t MAX_ROWSET_ID = 1L << 56;
 static constexpr int64_t LOW_56_BITS = 0x00ffffffffffffff;
 
@@ -368,6 +370,7 @@ struct OlapReaderStatistics {
 
     io::FileCacheStatistics file_cache_stats;
     int64_t load_segments_timer = 0;
+    int64_t delete_bitmap_get_agg_ns = 0;
 };
 
 using ColumnId = uint32_t;
@@ -469,11 +472,17 @@ class DeleteBitmap;
 // merge on write context
 struct MowContext {
     MowContext(int64_t version, int64_t txnid, const RowsetIdUnorderedSet& ids,
+               const std::vector<std::shared_ptr<Rowset>>& rowset_ptrs,
                std::shared_ptr<DeleteBitmap> db)
-            : max_version(version), txn_id(txnid), rowset_ids(ids), delete_bitmap(db) {}
+            : max_version(version),
+              txn_id(txnid),
+              rowset_ids(ids),
+              rowset_ptrs(rowset_ptrs),
+              delete_bitmap(db) {}
     int64_t max_version;
     int64_t txn_id;
     const RowsetIdUnorderedSet& rowset_ids;
+    std::vector<std::shared_ptr<Rowset>> rowset_ptrs;
     std::shared_ptr<DeleteBitmap> delete_bitmap;
 };
 

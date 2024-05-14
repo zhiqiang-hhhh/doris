@@ -1035,7 +1035,29 @@ public class PropertyAnalyzer {
 
     public static ReplicaAllocation analyzeReplicaAllocation(Map<String, String> properties, String prefix)
             throws AnalysisException {
+        if (!Config.force_olap_table_replication_allocation.isEmpty()) {
+            properties = forceRewriteReplicaAllocation(properties, prefix);
+        }
         return analyzeReplicaAllocationImpl(properties, prefix, true);
+    }
+
+    public static Map<String, String> forceRewriteReplicaAllocation(Map<String, String> properties,
+            String prefix) {
+        if (properties == null) {
+            properties = Maps.newHashMap();
+        }
+        String propNumKey = Strings.isNullOrEmpty(prefix) ? PROPERTIES_REPLICATION_NUM
+                : prefix + "." + PROPERTIES_REPLICATION_NUM;
+        if (properties.containsKey(propNumKey)) {
+            properties.remove(propNumKey);
+        }
+        String propTagKey = Strings.isNullOrEmpty(prefix) ? PROPERTIES_REPLICATION_ALLOCATION
+                : prefix + "." + PROPERTIES_REPLICATION_ALLOCATION;
+        if (properties.containsKey(propTagKey)) {
+            properties.remove(propTagKey);
+        }
+        properties.put(propTagKey,  Config.force_olap_table_replication_allocation);
+        return properties;
     }
 
     // There are 2 kinds of replication property:
@@ -1071,6 +1093,7 @@ public class PropertyAnalyzer {
         allocationVal = allocationVal.replaceAll(" ", "");
         String[] locations = allocationVal.split(",");
         int totalReplicaNum = 0;
+        Map<Tag, Integer> nextIndexs = Maps.newHashMap();
         for (String location : locations) {
             String[] parts = location.split(":");
             if (parts.length != 2) {
@@ -1094,7 +1117,7 @@ public class PropertyAnalyzer {
                 try {
                     SystemInfoService systemInfoService = Env.getCurrentSystemInfo();
                     systemInfoService.selectBackendIdsForReplicaCreation(
-                            replicaAlloc, null, false, true);
+                            replicaAlloc, nextIndexs, null, false, true);
                 } catch (DdlException ddlException) {
                     throw new AnalysisException(ddlException.getMessage());
                 }

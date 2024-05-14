@@ -116,6 +116,8 @@ public class SessionVariable implements Serializable, Writable {
     public static final String ENABLE_INSERT_STRICT = "enable_insert_strict";
     public static final String ENABLE_SPILLING = "enable_spilling";
     public static final String ENABLE_EXCHANGE_NODE_PARALLEL_MERGE = "enable_exchange_node_parallel_merge";
+
+    public static final String ENABLE_SERVER_SIDE_PREPARED_STATEMENT = "enable_server_side_prepared_statement";
     public static final String PREFER_JOIN_METHOD = "prefer_join_method";
 
     public static final String ENABLE_FOLD_CONSTANT_BY_BE = "enable_fold_constant_by_be";
@@ -461,6 +463,11 @@ public class SessionVariable implements Serializable, Writable {
     );
 
     public static final String ENABLE_STATS = "enable_stats";
+
+    public static final String LIMIT_ROWS_FOR_SINGLE_INSTANCE = "limit_rows_for_single_instance";
+
+    public static final String ENABLE_INVERTED_INDEX_COMPOUND_INLIST = "enable_inverted_index_compound_inlist";
+
     /**
      * If set false, user couldn't submit analyze SQL and FE won't allocate any related resources.
      */
@@ -604,11 +611,11 @@ public class SessionVariable implements Serializable, Writable {
 
     // The number of seconds to wait for a block to be written to a connection before aborting the write
     @VariableMgr.VarAttr(name = NET_WRITE_TIMEOUT)
-    public int netWriteTimeout = 60;
+    public int netWriteTimeout = 600;
 
     // The number of seconds to wait for a block to be written to a connection before aborting the write
     @VariableMgr.VarAttr(name = NET_READ_TIMEOUT)
-    public int netReadTimeout = 60;
+    public int netReadTimeout = 600;
 
     // The current time zone
     @VariableMgr.VarAttr(name = TIME_ZONE, needForward = true)
@@ -1073,6 +1080,10 @@ public class SessionVariable implements Serializable, Writable {
     @VariableMgr.VarAttr(name = TOPN_OPT_LIMIT_THRESHOLD)
     public long topnOptLimitThreshold = 1024;
 
+    @VariableMgr.VarAttr(name = ENABLE_SERVER_SIDE_PREPARED_STATEMENT, needForward = true, description = {
+            "是否启用开启服务端prepared statement", "Set whether to enable server side prepared statement."})
+    public boolean enableServeSidePreparedStatement = false;
+
     // Default value is false, which means the group by and having clause
     // should first use column name not alias. According to mysql.
     @VariableMgr.VarAttr(name = GROUP_BY_AND_HAVING_USE_ALIAS_FIRST)
@@ -1354,6 +1365,19 @@ public class SessionVariable implements Serializable, Writable {
             description = {"when it's true show processlist statement list all fe's connection",
                     "当变量为true时，show processlist命令展示所有fe的连接"})
     public boolean showAllFeConnection = false;
+
+    @VariableMgr.VarAttr(name = LIMIT_ROWS_FOR_SINGLE_INSTANCE,
+            description = {"当一个 ScanNode 上没有过滤条件，且 limit 值小于这个阈值时，"
+                    + "系统会将这个算子的并发度调整为1，以减少简单查询的扇出",
+                    "When a ScanNode has no filter conditions and the limit value is less than this threshold, "
+                            + "the system will adjust the concurrency of this operator to 1 "
+                            + "to reduce the fan-out of simple queries"})
+    public long limitRowsForSingleInstance = 10000;
+
+    @VariableMgr.VarAttr(name = ENABLE_INVERTED_INDEX_COMPOUND_INLIST,
+            description = {"让compound inlist条件可以使用倒排索引",
+                    "Let the compound inlist condition use an inverted index"})
+    public boolean enableInvertedIndexCompoundInlist = false;
 
     public Set<Integer> getIgnoredRuntimeFilterIds() {
         return Arrays.stream(ignoreRuntimeFilterIds.split(",[\\s]*"))
@@ -2563,6 +2587,8 @@ public class SessionVariable implements Serializable, Writable {
         tResult.setFasterFloatConvert(fasterFloatConvert);
 
         tResult.setInvertedIndexSkipThreshold(invertedIndexSkipThreshold);
+
+        tResult.setEnableInvertedIndexCompoundInlist(enableInvertedIndexCompoundInlist);
 
         return tResult;
     }

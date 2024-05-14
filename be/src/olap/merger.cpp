@@ -104,6 +104,11 @@ Status Merger::vmerge_rowsets(TabletSharedPtr tablet, ReaderType reader_type,
     size_t output_rows = 0;
     bool eof = false;
     while (!eof && !StorageEngine::instance()->stopped()) {
+        if (tablet->tablet_state() == TABLET_SHUTDOWN) {
+            return Status::Error<INTERNAL_ERROR>("tablet {} is not used any more",
+                                                 tablet->tablet_id());
+        }
+
         // Read one block from block reader
         RETURN_NOT_OK_STATUS_WITH_WARN(
                 reader.next_block_with_aggregation(&block, &eof),
@@ -176,10 +181,17 @@ void Merger::vertical_split_columns(TabletSchemaSPtr tablet_schema,
         if (i == sequence_col_idx || i == delete_sign_idx) {
             continue;
         }
-        if ((i - num_key_cols) % config::vertical_compaction_num_columns_per_group == 0) {
-            column_groups->emplace_back();
+
+        if (!value_columns.empty() &&
+            value_columns.size() % config::vertical_compaction_num_columns_per_group == 0) {
+            column_groups->push_back(value_columns);
+            value_columns.clear();
         }
-        column_groups->back().emplace_back(i);
+        value_columns.push_back(i);
+    }
+
+    if (!value_columns.empty()) {
+        column_groups->push_back(value_columns);
     }
 }
 

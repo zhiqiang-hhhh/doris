@@ -191,6 +191,7 @@ import org.apache.doris.qe.SqlModeHelper;
         keywordMap.put("desc", new Integer(SqlParserSymbols.KW_DESC));
         keywordMap.put("describe", new Integer(SqlParserSymbols.KW_DESCRIBE));
         keywordMap.put("diagnose", new Integer(SqlParserSymbols.KW_DIAGNOSE));
+        keywordMap.put("diagnosis", new Integer(SqlParserSymbols.KW_DIAGNOSIS));
         keywordMap.put("disk", new Integer(SqlParserSymbols.KW_DISK));
         keywordMap.put("distinct", new Integer(SqlParserSymbols.KW_DISTINCT));
         keywordMap.put("distinctpc", new Integer(SqlParserSymbols.KW_DISTINCTPC));
@@ -201,6 +202,7 @@ import org.apache.doris.qe.SqlModeHelper;
         keywordMap.put("double", new Integer(SqlParserSymbols.KW_DOUBLE));
         keywordMap.put("drop", new Integer(SqlParserSymbols.KW_DROP));
         keywordMap.put("dropp", new Integer(SqlParserSymbols.KW_DROPP));
+        keywordMap.put("dual", new Integer(SqlParserSymbols.KW_DUAL));
         keywordMap.put("duplicate", new Integer(SqlParserSymbols.KW_DUPLICATE));
         keywordMap.put("dynamic", new Integer(SqlParserSymbols.KW_DYNAMIC));
         keywordMap.put("else", new Integer(SqlParserSymbols.KW_ELSE));
@@ -484,6 +486,7 @@ import org.apache.doris.qe.SqlModeHelper;
         keywordMap.put("verbose", new Integer(SqlParserSymbols.KW_VERBOSE));
         keywordMap.put("version", new Integer(SqlParserSymbols.KW_VERSION));
         keywordMap.put("view", new Integer(SqlParserSymbols.KW_VIEW));
+        keywordMap.put("views", new Integer(SqlParserSymbols.KW_VIEWS));
         keywordMap.put("warnings", new Integer(SqlParserSymbols.KW_WARNINGS));
         keywordMap.put("week", new Integer(SqlParserSymbols.KW_WEEK));
         keywordMap.put("when", new Integer(SqlParserSymbols.KW_WHEN));
@@ -555,7 +558,6 @@ import org.apache.doris.qe.SqlModeHelper;
     tokenIdMap.put(new Integer(SqlParserSymbols.BITXOR), "^");
     tokenIdMap.put(new Integer(SqlParserSymbols.NUMERIC_OVERFLOW), "NUMERIC OVERFLOW");
     tokenIdMap.put(new Integer(SqlParserSymbols.PLACEHOLDER), "?");
-
   }
 
   public static boolean isKeyword(Integer tokenId) {

@@ -98,6 +98,7 @@ import org.apache.doris.common.ClientPool;
 import org.apache.doris.common.Config;
 import org.apache.doris.common.ConfigBase;
 import org.apache.doris.common.ConfigException;
+import org.apache.doris.common.DNSCache;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.ErrorCode;
 import org.apache.doris.common.ErrorReport;
@@ -205,6 +206,7 @@ import org.apache.doris.plugin.PluginMgr;
 import org.apache.doris.policy.PolicyMgr;
 import org.apache.doris.qe.AuditEventProcessor;
 import org.apache.doris.qe.ConnectContext;
+import org.apache.doris.qe.FEOpExecutor;
 import org.apache.doris.qe.GlobalVariable;
 import org.apache.doris.qe.JournalObservable;
 import org.apache.doris.qe.VariableMgr;
@@ -475,6 +477,8 @@ public class Env {
 
     private HiveTransactionMgr hiveTransactionMgr;
 
+    private DNSCache dnsCache;
+
     public List<Frontend> getFrontends(FrontendNodeType nodeType) {
         if (nodeType == null) {
             // get all
@@ -688,6 +692,7 @@ public class Env {
         this.binlogManager = new BinlogManager();
         this.binlogGcer = new BinlogGcer();
         this.columnIdFlusher = new ColumnIdFlushDaemon();
+        this.dnsCache = new DNSCache();
     }
 
     public static void destroyCheckpoint() {
@@ -819,17 +824,19 @@ public class Env {
         return getCurrentEnv().getHiveTransactionMgr();
     }
 
+    public DNSCache getDnsCache() {
+        return dnsCache;
+    }
+
     // Use tryLock to avoid potential dead lock
     private boolean tryLock(boolean mustLock) {
         while (true) {
             try {
                 if (!lock.tryLock(Config.catalog_try_lock_timeout_ms, TimeUnit.MILLISECONDS)) {
-                    if (LOG.isDebugEnabled()) {
-                        // to see which thread held this lock for long time.
-                        Thread owner = lock.getOwner();
-                        if (owner != null) {
-                            LOG.debug("catalog lock is held by: {}", Util.dumpThread(owner, 10));
-                        }
+                    // to see which thread held this lock for long time.
+                    Thread owner = lock.getOwner();
+                    if (owner != null) {
+                        LOG.info("env lock is held by: {}", Util.dumpThread(owner, 10));
                     }
 
                     if (mustLock) {
@@ -840,7 +847,7 @@ public class Env {
                 }
                 return true;
             } catch (InterruptedException e) {
-                LOG.warn("got exception while getting catalog lock", e);
+                LOG.warn("got exception while getting env lock", e);
                 if (mustLock) {
                     continue;
                 } else {
@@ -1544,6 +1551,7 @@ public class Env {
         getInternalCatalog().getEsRepository().start();
         // domain resolver
         domainResolver.start();
+        dnsCache.start();
     }
 
     private void transferToNonMaster(FrontendNodeType newType) {
@@ -2598,7 +2606,7 @@ public class Env {
 
     public void addFrontend(FrontendNodeType role, String host, int editLogPort) throws DdlException {
         if (!tryLock(false)) {
-            throw new DdlException("Failed to acquire catalog lock. Try again");
+            throw new DdlException("Failed to acquire env lock. Try again");
         }
         try {
             Frontend fe = checkFeExist(host, editLogPort);
@@ -2644,7 +2652,7 @@ public class Env {
 
     public void modifyFrontendHost(String nodeName, String destHost) throws DdlException {
         if (!tryLock(false)) {
-            throw new DdlException("Failed to acquire catalog lock. Try again");
+            throw new DdlException("Failed to acquire env lock. Try again");
         }
         try {
             Frontend fe = getFeByName(nodeName);
@@ -2675,7 +2683,7 @@ public class Env {
             throw new DdlException("can not drop current master node.");
         }
         if (!tryLock(false)) {
-            throw new DdlException("Failed to acquire catalog lock. Try again");
+            throw new DdlException("Failed to acquire env lock. Try again");
         }
         try {
             Frontend fe = checkFeExist(host, port);
@@ -3113,6 +3121,13 @@ public class Env {
             if (olapTable.isInMemory()) {
                 sb.append(",\n\"").append(PropertyAnalyzer.PROPERTIES_INMEMORY).append("\" = \"");
                 sb.append(olapTable.isInMemory()).append("\"");
+            }
+
+            // storage medium
+            if (olapTable.getStorageMedium() != null) {
+                sb.append(",\n\"").append(PropertyAnalyzer.PROPERTIES_STORAGE_MEDIUM).append("\" = \"");
+                sb.append(olapTable.getStorageMedium().name().toLowerCase());
+                sb.append("\"");
             }
 
             // storage type
@@ -3905,9 +3920,15 @@ public class Env {
     public static short calcShortKeyColumnCount(List<Column> columns, Map<String, String> properties,
                                                 boolean isKeysRequired) throws DdlException {
         List<Column> indexColumns = new ArrayList<Column>();
+        boolean hasValueColumn = false;
         for (Column column : columns) {
             if (column.isKey()) {
+                if (hasValueColumn && isKeysRequired) {
+                    throw new DdlException("The materialized view not support value column before key column");
+                }
                 indexColumns.add(column);
+            } else {
+                hasValueColumn = true;
             }
         }
         LOG.debug("index column size: {}", indexColumns.size());
@@ -5050,7 +5071,7 @@ public class Env {
         globalFunctionMgr.replayDropFunction(functionSearchDesc);
     }
 
-    public void setConfig(AdminSetConfigStmt stmt) throws DdlException {
+    public void setConfig(AdminSetConfigStmt stmt) throws Exception {
         Map<String, String> configs = stmt.getConfigs();
         Preconditions.checkState(configs.size() == 1);
 
@@ -5059,6 +5080,22 @@ public class Env {
                 ConfigBase.setMutableConfig(entry.getKey(), entry.getValue());
             } catch (ConfigException e) {
                 throw new DdlException(e.getMessage());
+            }
+        }
+
+        if (stmt.isApplyToAll()) {
+            for (Frontend fe : Env.getCurrentEnv().getFrontends(null /* all */)) {
+                if (!fe.isAlive() || fe.getHost().equals(Env.getCurrentEnv().getSelfNode().getHost())) {
+                    continue;
+                }
+
+                TNetworkAddress feAddr = new TNetworkAddress(fe.getHost(), fe.getRpcPort());
+                FEOpExecutor executor = new FEOpExecutor(feAddr, stmt.getLocalSetStmt(), ConnectContext.get(), false);
+                executor.execute();
+                if (executor.getStatusCode() != TStatusCode.OK.getValue()) {
+                    throw new DdlException(String.format("failed to apply to fe %s:%s, error message: %s",
+                        fe.getHost(), fe.getRpcPort(), executor.getErrMsg()));
+                }
             }
         }
     }
@@ -5299,18 +5336,17 @@ public class Env {
         long tabletId = stmt.getTabletId();
         long backendId = stmt.getBackendId();
         ReplicaStatus status = stmt.getStatus();
-        setReplicaStatusInternal(tabletId, backendId, status, false);
-    }
-
-    public void setReplicaStatus(long tabletId, long backendId, ReplicaStatus status) throws MetaNotFoundException {
-        setReplicaStatusInternal(tabletId, backendId, status, false);
+        long userDropTime = status == ReplicaStatus.DROP ? System.currentTimeMillis() : -1L;
+        setReplicaStatusInternal(tabletId, backendId, status, userDropTime, false);
     }
 
     public void replaySetReplicaStatus(SetReplicaStatusOperationLog log) throws MetaNotFoundException {
-        setReplicaStatusInternal(log.getTabletId(), log.getBackendId(), log.getReplicaStatus(), true);
+        setReplicaStatusInternal(log.getTabletId(), log.getBackendId(), log.getReplicaStatus(),
+                log.getUserDropTime(), true);
     }
 
-    private void setReplicaStatusInternal(long tabletId, long backendId, ReplicaStatus status, boolean isReplay)
+    private void setReplicaStatusInternal(long tabletId, long backendId, ReplicaStatus status, long userDropTime,
+            boolean isReplay)
             throws MetaNotFoundException {
         try {
             TabletMeta meta = tabletInvertedIndex.getTabletMeta(tabletId);
@@ -5325,21 +5361,24 @@ public class Env {
                 if (replica == null) {
                     throw new MetaNotFoundException("replica does not exist on backend, beId=" + backendId);
                 }
+                boolean updated = false;
                 if (status == ReplicaStatus.BAD || status == ReplicaStatus.OK) {
-                    replica.setUserDrop(false);
+                    replica.setUserDropTime(-1L);
                     if (replica.setBad(status == ReplicaStatus.BAD)) {
-                        if (!isReplay) {
-                            SetReplicaStatusOperationLog log = new SetReplicaStatusOperationLog(backendId, tabletId,
-                                    status);
-                            getEditLog().logSetReplicaStatus(log);
-                        }
+                        updated = true;
                         LOG.info("set replica {} of tablet {} on backend {} as {}. is replay: {}", replica.getId(),
                                 tabletId, backendId, status, isReplay);
                     }
                 } else if (status == ReplicaStatus.DROP) {
-                    replica.setUserDrop(true);
+                    replica.setUserDropTime(userDropTime);
+                    updated = true;
                     LOG.info("set replica {} of tablet {} on backend {} as {}.", replica.getId(),
                             tabletId, backendId, status);
+                }
+                if (updated && !isReplay) {
+                    SetReplicaStatusOperationLog log = new SetReplicaStatusOperationLog(backendId, tabletId,
+                            status, userDropTime);
+                    getEditLog().logSetReplicaStatus(log);
                 }
             } finally {
                 table.writeUnlock();

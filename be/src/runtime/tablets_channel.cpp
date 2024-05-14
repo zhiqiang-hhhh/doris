@@ -96,8 +96,9 @@ void TabletsChannel::_init_profile(RuntimeProfile* profile) {
 
 Status TabletsChannel::open(const PTabletWriterOpenRequest& request) {
     std::lock_guard<std::mutex> l(_lock);
-    if (_state == kOpened) {
-        // Normal case, already open by other sender
+    // if _state is kOpened, it's a normal case, already open by other sender
+    // if _state is kFinished, already cancelled by other sender
+    if (_state == kOpened || _state == kFinished) {
         return Status::OK();
     }
     LOG(INFO) << "open tablets channel: " << _key << ", tablets num: " << request.tablets().size()
@@ -448,9 +449,6 @@ Status TabletsChannel::add_batch(const PTabletWriterAddBlockRequest& request,
 
     std::unordered_map<int64_t /* tablet_id */, std::vector<int> /* row index */> tablet_to_rowidxs;
     for (int i = 0; i < request.tablet_ids_size(); ++i) {
-        if (request.is_single_tablet_block()) {
-            break;
-        }
         int64_t tablet_id = request.tablet_ids(i);
         if (_is_broken_tablet(tablet_id)) {
             // skip broken tablets
@@ -496,18 +494,11 @@ Status TabletsChannel::add_batch(const PTabletWriterAddBlockRequest& request,
         return Status::OK();
     };
 
-    if (request.is_single_tablet_block()) {
-        SCOPED_TIMER(_write_block_timer);
-        RETURN_IF_ERROR(write_tablet_data(request.tablet_ids(0), [&](DeltaWriter* writer) {
-            return writer->append(&send_data);
+    SCOPED_TIMER(_write_block_timer);
+    for (const auto& tablet_to_rowidxs_it : tablet_to_rowidxs) {
+        RETURN_IF_ERROR(write_tablet_data(tablet_to_rowidxs_it.first, [&](DeltaWriter* writer) {
+            return writer->write(&send_data, tablet_to_rowidxs_it.second);
         }));
-    } else {
-        SCOPED_TIMER(_write_block_timer);
-        for (const auto& tablet_to_rowidxs_it : tablet_to_rowidxs) {
-            RETURN_IF_ERROR(write_tablet_data(tablet_to_rowidxs_it.first, [&](DeltaWriter* writer) {
-                return writer->write(&send_data, tablet_to_rowidxs_it.second);
-            }));
-        }
     }
 
     {

@@ -52,6 +52,7 @@ import org.apache.doris.catalog.Tablet;
 import org.apache.doris.catalog.TabletMeta;
 import org.apache.doris.catalog.View;
 import org.apache.doris.clone.DynamicPartitionScheduler;
+import org.apache.doris.common.Config;
 import org.apache.doris.common.DdlException;
 import org.apache.doris.common.FeMetaVersion;
 import org.apache.doris.common.MarkedCountDownLatch;
@@ -188,6 +189,10 @@ public class RestoreJob extends AbstractJob {
         this.state = RestoreJobState.PENDING;
         this.metaVersion = metaVersion;
         this.reserveReplica = reserveReplica;
+        // if backup snapshot is come from a cluster with force replication allocation, ignore the origin allocation
+        if (jobInfo.isForceReplicationAllocation) {
+            this.reserveReplica = false;
+        }
         this.reserveDynamicPartitionEnable = reserveDynamicPartitionEnable;
         this.isBeingSynced = isBeingSynced;
         properties.put(PROP_RESERVE_REPLICA, String.valueOf(reserveReplica));
@@ -590,13 +595,20 @@ public class RestoreJob extends AbstractJob {
                             status = st;
                             return;
                         }
-                        LOG.debug("get intersect part names: {}, job: {}", intersectPartNames, this);
-                        if (!localOlapTbl.getSignature(BackupHandler.SIGNATURE_VERSION, intersectPartNames)
-                                .equals(remoteOlapTbl.getSignature(
-                                        BackupHandler.SIGNATURE_VERSION, intersectPartNames))) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("get intersect part names: {}, job: {}", intersectPartNames, this);
+                        }
+                        String localTblSignature = localOlapTbl.getSignature(
+                                BackupHandler.SIGNATURE_VERSION, intersectPartNames);
+                        String remoteTblSignature = remoteOlapTbl.getSignature(
+                                BackupHandler.SIGNATURE_VERSION, intersectPartNames);
+                        if (!localTblSignature.equals(remoteTblSignature)) {
+                            String alias = jobInfo.getAliasByOriginNameIfSet(tableName);
+                            LOG.warn("Table {} already exists but with different schema, "
+                                    + "local table: {}, remote table: {}",
+                                    alias, localTblSignature, remoteTblSignature);
                             status = new Status(ErrCode.COMMON_ERROR, "Table "
-                                    + jobInfo.getAliasByOriginNameIfSet(tableName)
-                                    + " already exist but with different schema");
+                                    + alias + " already exist but with different schema");
                             return;
                         }
 
@@ -1094,6 +1106,7 @@ public class RestoreJob extends AbstractJob {
         long visibleVersion = remotePart.getVisibleVersion();
 
         // tablets
+        Map<Tag, Integer> nextIndexs = Maps.newHashMap();
         for (MaterializedIndex remoteIdx : remotePart.getMaterializedIndices(IndexExtState.VISIBLE)) {
             int schemaHash = remoteTbl.getSchemaHashByIndexId(remoteIdx.getId());
             int remotetabletSize = remoteIdx.getTablets().size();
@@ -1107,8 +1120,9 @@ public class RestoreJob extends AbstractJob {
 
                 // replicas
                 try {
-                    Map<Tag, List<Long>> beIds = Env.getCurrentSystemInfo()
-                            .selectBackendIdsForReplicaCreation(replicaAlloc, null, false, false);
+                    Pair<Map<Tag, List<Long>>, TStorageMedium> beIdsAndMedium = Env.getCurrentSystemInfo()
+                            .selectBackendIdsForReplicaCreation(replicaAlloc, nextIndexs,  null, false, false);
+                    Map<Tag, List<Long>> beIds = beIdsAndMedium.first;
                     for (Map.Entry<Tag, List<Long>> entry : beIds.entrySet()) {
                         for (Long beId : entry.getValue()) {
                             long newReplicaId = env.getNextId();
@@ -1340,8 +1354,7 @@ public class RestoreJob extends AbstractJob {
                 for (Long beId : beToSnapshots.keySet()) {
                     List<SnapshotInfo> beSnapshotInfos = beToSnapshots.get(beId);
                     int totalNum = beSnapshotInfos.size();
-                    // each backend allot at most 3 tasks
-                    int batchNum = Math.min(totalNum, 3);
+                    int batchNum = Math.min(totalNum, Config.restore_download_task_num_per_be);
                     // each task contains several upload sub tasks
                     int taskNumPerBatch = Math.max(totalNum / batchNum, 1);
                     LOG.debug("backend {} has {} batch, total {} tasks, {}",
@@ -1493,8 +1506,7 @@ public class RestoreJob extends AbstractJob {
                 for (Long beId : beToSnapshots.keySet()) {
                     List<SnapshotInfo> beSnapshotInfos = beToSnapshots.get(beId);
                     int totalNum = beSnapshotInfos.size();
-                    // each backend allot at most 3 tasks
-                    int batchNum = Math.min(totalNum, 3);
+                    int batchNum = Math.min(totalNum, Config.restore_download_task_num_per_be);
                     // each task contains several upload sub tasks
                     int taskNumPerBatch = Math.max(totalNum / batchNum, 1);
 
@@ -1745,6 +1757,8 @@ public class RestoreJob extends AbstractJob {
             releaseSnapshots();
 
             snapshotInfos.clear();
+            fileMapping.clear();
+            jobInfo.releaseSnapshotInfo();
 
             finishedTime = System.currentTimeMillis();
             state = RestoreJobState.FINISHED;
@@ -1937,6 +1951,9 @@ public class RestoreJob extends AbstractJob {
             releaseSnapshots();
 
             snapshotInfos.clear();
+            fileMapping.clear();
+            jobInfo.releaseSnapshotInfo();
+
             RestoreJobState curState = state;
             finishedTime = System.currentTimeMillis();
             state = RestoreJobState.CANCELLED;

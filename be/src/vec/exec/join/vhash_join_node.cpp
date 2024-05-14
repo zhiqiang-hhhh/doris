@@ -550,7 +550,7 @@ Status HashJoinNode::pull(doris::RuntimeState* state, vectorized::Block* output_
 
     /// `_has_null_in_build_side` means have null value in build side.
     /// `_short_circuit_for_null_in_build_side` means short circuit if has null in build side(e.g. null aware left anti join).
-    if (_has_null_in_build_side && _short_circuit_for_null_in_build_side && _is_mark_join) {
+    if (_has_null_in_build_side && _short_circuit_for_null_in_build_side) {
         /// We need to create a column as mark with all rows set to NULL.
         auto block_rows = _probe_block.rows();
         if (block_rows == 0) {
@@ -563,10 +563,13 @@ Status HashJoinNode::pull(doris::RuntimeState* state, vectorized::Block* output_
         for (int i = 0; i < _left_output_slot_flags.size(); ++i) {
             temp_block.insert(_probe_block.get_by_position(i));
         }
-        auto mark_column = ColumnNullable::create(ColumnUInt8::create(block_rows, 0),
-                                                  ColumnUInt8::create(block_rows, 1));
-        temp_block.insert(
-                {std::move(mark_column), make_nullable(std::make_shared<DataTypeUInt8>()), ""});
+
+        if (_is_mark_join) {
+            auto mark_column = ColumnNullable::create(ColumnUInt8::create(block_rows, 0),
+                                                      ColumnUInt8::create(block_rows, 1));
+            temp_block.insert(
+                    {std::move(mark_column), make_nullable(std::make_shared<DataTypeUInt8>()), ""});
+        }
 
         {
             SCOPED_TIMER(_join_filter_timer);
@@ -737,11 +740,13 @@ Status HashJoinNode::push(RuntimeState* /*state*/, vectorized::Block* input_bloc
         _probe_columns.resize(probe_expr_ctxs_sz);
 
         std::vector<int> res_col_ids(probe_expr_ctxs_sz);
+        RETURN_IF_ERROR(
+                _do_evaluate(*input_block, _probe_expr_ctxs, *_probe_expr_call_timer, res_col_ids));
         if (_join_op == TJoinOp::RIGHT_OUTER_JOIN || _join_op == TJoinOp::FULL_OUTER_JOIN) {
             _probe_column_convert_to_null = _convert_block_to_null(*input_block);
         }
-        RETURN_IF_ERROR(
-                _do_evaluate(*input_block, _probe_expr_ctxs, *_probe_expr_call_timer, res_col_ids));
+        //        RETURN_IF_ERROR(
+        //                _do_evaluate(*input_block, _probe_expr_ctxs, *_probe_expr_call_timer, res_col_ids));
 
         // TODO: Now we are not sure whether a column is nullable only by ExecNode's `row_desc`
         //  so we have to initialize this flag by the first probe block.
@@ -841,6 +846,9 @@ void HashJoinNode::_prepare_probe_block() {
 
     // remove add nullmap of probe columns
     for (auto index : _probe_column_convert_to_null) {
+        if (index >= _probe_block.columns()) {
+            continue;
+        }
         auto& column_type = _probe_block.safe_get_by_position(index);
         DCHECK(column_type.column->is_nullable() || is_column_const(*(column_type.column.get())));
         DCHECK(column_type.type->is_nullable());
@@ -904,6 +912,13 @@ Status HashJoinNode::_materialize_build_side(RuntimeState* state) {
                                   std::placeholders::_3)));
             }
             RETURN_IF_ERROR(sink(state, &block, eos));
+        }
+
+        // For broadcast join, if `sink` is not called with eos,
+        // other instances will not be signaled.
+        if (!eos) {
+            Block tmp_block;
+            RETURN_IF_ERROR(sink(state, &tmp_block, true));
         }
         RETURN_IF_ERROR(child(1)->close(state));
     } else {
