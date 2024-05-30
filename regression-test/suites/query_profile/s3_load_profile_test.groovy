@@ -174,7 +174,7 @@ PROPERTIES (
     logger.info("profileDataString:" + profileDataString)
     def taskStateIdx = profileDataString.indexOf("Task&nbsp;&nbsp;State:&nbsp;&nbsp;FINISHED")
     assertFalse(taskStateIdx == -1)
-    def fragmentIdx = profileDataString.indexOf("RowsReturned")
+    def fragmentIdx = profileDataString.indexOf("OLAP_TABLE_SINK_OPERATOR")
     assertFalse(fragmentIdx == -1)
     def executionProfileIdx = profileDataString.indexOf("Execution&nbsp;&nbsp;Profile")
     assertFalse(executionProfileIdx == -1)
