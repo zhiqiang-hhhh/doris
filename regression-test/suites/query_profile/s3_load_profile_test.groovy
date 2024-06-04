@@ -172,16 +172,9 @@ PROPERTIES (
     assertEquals(0, profileJson.code)
     profileDataString = profileJson.data
     logger.info("profileDataString:" + profileDataString)
-    def taskStateIdx = profileDataString.indexOf("Task&nbsp;&nbsp;State:&nbsp;&nbsp;FINISHED")
-    assertFalse(taskStateIdx == -1)
-    def fragmentIdx = profileDataString.indexOf("RowsReturned")
-    assertFalse(fragmentIdx == -1)
-    def executionProfileIdx = profileDataString.indexOf("Execution&nbsp;&nbsp;Profile")
-    assertFalse(executionProfileIdx == -1)
-    if (!profileDataString.contains("NumScanners") || !profileDataString.contains("BlocksProduced")
-        || !profileDataString.contains("RowsProduced") || !profileDataString.contains("RowsRead")) {
-            logger.info("profileDataString:" + profileDataString)
-    }
+    assertTrue(profileDataString.contains("Task&nbsp;&nbsp;State:&nbsp;&nbsp;FINISHED"))
+    assertTrue(profileDataString.contains("OLAP_TABLE_SINK_OPERATOR"))
+    assertTrue(profileDataString.contains("Execution&nbsp;&nbsp;Profile"))
     assertTrue(profileDataString.contains("NumScanners"))
     assertTrue(profileDataString.contains("BlocksProduced"))
     assertTrue(profileDataString.contains("RowsProduced"))
