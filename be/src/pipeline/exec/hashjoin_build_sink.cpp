@@ -182,6 +182,7 @@ Status HashJoinBuildSinkLocalState::_do_evaluate(vectorized::Block& block,
         block.get_by_position(result_col_id).column =
                 block.get_by_position(result_col_id).column->convert_to_full_column_if_const();
         res_col_ids[i] = result_col_id;
+        LOG_INFO("i {} result_col_id {}", i, result_col_id);
     }
     return Status::OK();
 }
@@ -530,6 +531,12 @@ Status HashJoinBuildSinkOperatorX::sink(RuntimeState* state, vectorized::Block* 
             local_state._build_blocks.emplace_back(std::move(*in_block));
         }
     }
+
+    LOG_INFO(
+            "build side input rows: {}, local_state._build_side_rows {}, "
+            "local_state._should_build_hash_table {}, eos {}",
+            in_block->rows(), local_state._build_side_rows, local_state._should_build_hash_table,
+            eos);
 
     if (local_state._should_build_hash_table && eos) {
         DCHECK(!local_state._build_side_mutable_block.empty());

@@ -700,12 +700,24 @@ std::string FragmentMgr::dump_pipeline_tasks(TUniqueId& query_id) {
 
 Status FragmentMgr::exec_plan_fragment(const TPipelineFragmentParams& params,
                                        const FinishCallback& cb) {
-    VLOG_ROW << "query: " << print_id(params.query_id) << " exec_plan_fragment params is "
-             << apache::thrift::ThriftDebugString(params).c_str();
-    // sometimes TExecPlanFragmentParams debug string is too long and glog
+    if (VLOG_ROW_IS_ON) {
+        auto dbg_str = apache::thrift::ThriftDebugString(params);
+        constexpr size_t max_log_size = 30000 - 100;
+        size_t pos = 0;
+        size_t total_size = dbg_str.size();
+        size_t tmp_size = std::min(max_log_size, total_size);
+        VLOG_ROW << fmt::format("Query {} plan:", print_id(params.query_id));
+        while (pos < total_size) {
+            tmp_size = std::min(max_log_size, total_size - pos);
+            VLOG_ROW << fmt::format("{}", std::string_view(dbg_str.data() + pos, tmp_size));
+            pos += tmp_size;
+        }
+        // VLOG_ROW << fmt::format("Query {} query option {}", print_id(params.query_id),
+        //                         apache::thrift::ThriftDebugString(params.query_options));
+    }
     // will truncate the log line, so print query options seperately for debuggin purpose
-    VLOG_ROW << "query: " << print_id(params.query_id) << "query options is "
-             << apache::thrift::ThriftDebugString(params.query_options).c_str();
+    // VLOG_ROW << "query: " << print_id(params.query_id) << "query options is "
+    //          << apache::thrift::ThriftDebugString(params.query_options).c_str();
 
     std::shared_ptr<QueryContext> query_ctx;
     RETURN_IF_ERROR(_get_query_ctx(params, params.query_id, true, query_ctx));
