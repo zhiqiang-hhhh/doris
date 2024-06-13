@@ -47,10 +47,7 @@ import com.google.common.collect.Maps;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.thrift.TException;
-import org.openjdk.jol.info.ClassLayout;
-import org.openjdk.jol.vm.VM;
 
 import java.util.Deque;
 import java.util.Iterator;
