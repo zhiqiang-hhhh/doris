@@ -47,7 +47,10 @@ import com.google.common.collect.Maps;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.lucene.util.RamUsageEstimator;
 import org.apache.thrift.TException;
+import org.openjdk.jol.info.ClassLayout;
+import org.openjdk.jol.vm.VM;
 
 import java.util.Deque;
 import java.util.Iterator;
@@ -294,11 +297,13 @@ public class ProfileManager {
             LOG.warn("Fetch a agent client failed, address: {}", targetBackend.toString());
             return resp;
         }
-
+        TGetRealtimeExecStatusRequest req = new TGetRealtimeExecStatusRequest();
+        req.setId(queryID);
         try {
-            TGetRealtimeExecStatusRequest req = new TGetRealtimeExecStatusRequest();
-            req.setId(queryID);
+            long startTime = System.currentTimeMillis(); // Start timer
             resp = client.getRealtimeExecStatus(req);
+            long endTime = System.currentTimeMillis(); // End timer
+            LOG.info("Fetch profile {} rpc cost {} milliseconds", DebugUtil.printId(queryID), endTime - startTime);
         } catch (TException e) {
             LOG.warn("Got exception when getRealtimeExecStatus, query {} backend {}",
                     DebugUtil.printId(queryID), targetBackend.toString(), e);
@@ -340,7 +345,7 @@ public class ProfileManager {
         try {
             queryId = DebugUtil.parseTUniqueIdFromString(id);
         } catch (NumberFormatException e) {
-            LOG.warn("Failed to parse TUniqueId from string {} when fetch profile", id, e);
+            LOG.warn("Failed to parse TUniqueId from string {} when fetch profile", id);
         }
         List<QueryIdAndAddress> involvedBackends = Lists.newArrayList();
 
@@ -390,35 +395,57 @@ public class ProfileManager {
             }
         }
 
+        long s = System.currentTimeMillis();
         for (QueryIdAndAddress idAndAddress : involvedBackends) {
             Callable<TGetRealtimeExecStatusResponse> task = () -> {
-                return getRealtimeQueryProfile(idAndAddress.id, idAndAddress.beAddress);
+                LOG.info("Fetching real-time profile for query {}, backend {}", id, idAndAddress.beAddress.toString());
+                long s2 = System.currentTimeMillis();
+                TGetRealtimeExecStatusResponse resp = getRealtimeQueryProfile(idAndAddress.id, idAndAddress.beAddress);
+                LOG.info("Profile {} fetch task costs {} milliseconds", id, System.currentTimeMillis() - s2);
+                return resp;
             };
             Future<TGetRealtimeExecStatusResponse> future = fetchRealTimeProfileExecutor.submit(task);
             futures.add(future);
         }
+        LOG.info("Profile {} submit future costs {}", id, System.currentTimeMillis() - s);
 
         return futures;
     }
 
+    private static String prettyPrintBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        int exp = (int) (Math.log(bytes) / Math.log(1024));
+        String pre = ("KMGTPE").charAt(exp-1) + ("B");
+        return String.format("%.1f %s", bytes / Math.pow(1024, exp), pre);
+    }
+
     public String getProfile(String id) {
+        long startTime = System.currentTimeMillis(); // Start timer
         List<Future<TGetRealtimeExecStatusResponse>> futures = createFetchRealTimeProfileTasks(id);
         // beAddr of reportExecStatus of QeProcessorImpl is meaningless, so assign a dummy address
         // to avoid compile failing.
         TNetworkAddress dummyAddr = new TNetworkAddress();
+        long t0 = System.currentTimeMillis(); // Start timer
         for (Future<TGetRealtimeExecStatusResponse> future : futures) {
             try {
-                TGetRealtimeExecStatusResponse resp = future.get(5, TimeUnit.SECONDS);
+                long t = System.currentTimeMillis();
+                TGetRealtimeExecStatusResponse resp = future.get(500, TimeUnit.SECONDS);
+                LOG.info("Profile {} future fetch costs {} milliseconds", id, System.currentTimeMillis() - t);
                 if (resp != null) {
+                    t = System.currentTimeMillis();
                     QeProcessorImpl.INSTANCE.reportExecStatus(resp.getReportExecStatusParams(), dummyAddr);
+                    LOG.info("Profile {} futuer update costs {} milliseconds", id, System.currentTimeMillis() - t);
                 }
             } catch (Exception e) {
                 LOG.warn("Failed to get real-time profile, id {}, error: {}", id, e.getMessage(), e);
             }
         }
+        
 
         if (!futures.isEmpty()) {
             LOG.info("Get real-time exec status finished, id {}", id);
+            long t02 = System.currentTimeMillis(); // Start timer
+            LOG.info("Profile {} schedule & fetch & update cost {} milliseconds", id, t02 - t0);
         }
 
         readLock.lock();
@@ -427,9 +454,15 @@ public class ProfileManager {
             if (element == null) {
                 return null;
             }
-
-            return element.getProfileContent();
+            long t1 = System.currentTimeMillis(); // Start timer
+            String profileContent = element.getProfileContent();
+            long t2 = System.currentTimeMillis(); // Start timer
+            LOG.info("Profile {} size {} to string costs {} milliseconds",
+                    id, prettyPrintBytes(profileContent.length()), t2 - t1);
+            return profileContent;
         } finally {
+            long endTime = System.currentTimeMillis(); // Start timer
+            LOG.info("Get profile {} total cost {} milliseconds", id, endTime - startTime);
             readLock.unlock();
         }
     }

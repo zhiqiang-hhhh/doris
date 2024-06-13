@@ -42,24 +42,29 @@ import javax.servlet.http.HttpServletResponse;
 public class ProfileAction extends RestBaseController {
     private static final Logger LOG = LogManager.getLogger(ProfileAction.class);
 
+    @SuppressWarnings("finally")
     @RequestMapping(path = "/api/profile", method = RequestMethod.GET)
     protected Object profile(HttpServletRequest request, HttpServletResponse response) {
-        executeCheckPassword(request, response);
-        checkGlobalAuth(ConnectContext.get().getCurrentUserIdentity(), PrivPredicate.ADMIN);
-
+        long start = System.currentTimeMillis();
+        Map<String, String> result = Maps.newHashMap();
         String queryId = request.getParameter("query_id");
         if (Strings.isNullOrEmpty(queryId)) {
             return ResponseEntityBuilder.badRequest("Missing query_id");
         }
 
-        String queryProfileStr = ProfileManager.getInstance().getProfile(queryId);
-        if (queryProfileStr == null) {
-            return ResponseEntityBuilder.okWithCommonError("query id " + queryId + " not found.");
-        }
+        try {
+            executeCheckPassword(request, response);
+            checkGlobalAuth(ConnectContext.get().getCurrentUserIdentity(), PrivPredicate.ADMIN);
+            String queryProfileStr = ProfileManager.getInstance().getProfile(queryId);
+            if (queryProfileStr == null) {
+                return ResponseEntityBuilder.okWithCommonError("query id " + queryId + " not found.");
+            }
 
-        Map<String, String> result = Maps.newHashMap();
-        result.put("profile", queryProfileStr);
-        return ResponseEntityBuilder.ok(result);
+            result.put("profile", queryProfileStr);
+        } finally {
+            LOG.info("Get profile {}, costs {} milliseconds", queryId, System.currentTimeMillis() - start);
+            return ResponseEntityBuilder.ok(result);
+        }
     }
 
     @RequestMapping(path = "/api/profile/text", method = RequestMethod.GET)

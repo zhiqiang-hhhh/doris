@@ -145,7 +145,7 @@ public class Profile {
                 builder.append("\n MergedProfile \n");
                 this.executionProfiles.get(0).getAggregatedFragmentsProfile(planNodeMap).prettyPrint(builder, "     ");
             } catch (Throwable aggProfileException) {
-                LOG.warn("build merged simple profile failed", aggProfileException);
+                // LOG.warn("build merged simple profile failed", aggProfileException);
                 builder.append("build merged simple profile failed");
             }
         }

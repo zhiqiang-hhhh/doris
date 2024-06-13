@@ -252,12 +252,12 @@ public final class QeProcessorImpl implements QeProcessor {
         }
 
         if (params.isSetProfile() || params.isSetLoadChannelProfile()) {
-            LOG.info("ReportExecStatus(): fragment_instance_id={}, query id={}, backend num: {}, ip: {}",
-                    DebugUtil.printId(params.fragment_instance_id), DebugUtil.printId(params.query_id),
-                    params.backend_num, beAddr);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("params: {}", params);
-            }
+            // LOG.info("ReportExecStatus(): fragment_instance_id={}, query id={}, backend num: {}, ip: {}",
+            //         DebugUtil.printId(params.fragment_instance_id), DebugUtil.printId(params.query_id),
+            //         params.backend_num, beAddr);
+            // if (LOG.isDebugEnabled()) {
+            //     LOG.debug("params: {}", params);
+            // }
             ExecutionProfile executionProfile = ProfileManager.getInstance().getExecutionProfile(params.query_id);
             if (executionProfile != null) {
                 // Update profile may cost a lot of time, use a seperate pool to deal with it.
