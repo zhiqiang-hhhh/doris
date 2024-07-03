@@ -173,11 +173,24 @@ public:
         const KeyType* keys = get_keys(keys_container, *columns[0], batch_size);
         auto& set = this->data(place).set;
 
+        struct CacheEntry {
+            size_t hash_value;
+        };
+
+        std::vector<CacheEntry> cache(batch_size);
+
+        for (size_t i = 0; i < batch_size; ++i) {
+            size_t hash_value = set.hash_function()(keys[i]);
+            cache[i] = CacheEntry{hash_value};
+        }
+        auto prefetch_idx = HASH_MAP_PREFETCH_DIST;
         for (size_t i = 0; i != batch_size; ++i) {
-            if (i + HASH_MAP_PREFETCH_DIST < batch_size) {
-                set.prefetch(keys[i + HASH_MAP_PREFETCH_DIST]);
+            if (prefetch_idx < batch_size) {
+                set.prefetch_hash(cache[prefetch_idx].hash_value);
+                prefetch_idx++;
             }
-            set.insert(keys[i]);
+
+            set.emplace_with_hash(cache[i].hash_value, keys[i]);
         }
     }
 
