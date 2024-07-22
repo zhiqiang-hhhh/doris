@@ -343,6 +343,7 @@ struct MethodOneNumber : public MethodBase<TData> {
         if (is_join) {
             Base::init_join_bucket_num(num_rows, bucket_size, null_map);
         } else {
+            // Compute hash values in advance.
             Base::init_hash_values(num_rows, null_map);
         }
     }

@@ -78,8 +78,7 @@ private:
     void _find_in_hash_table(vectorized::AggregateDataPtr* places,
                              vectorized::ColumnRawPtrs& key_columns, size_t num_rows);
     int _get_slot_column_id(const vectorized::AggFnEvaluator* evaluator);
-    void _emplace_into_hash_table(vectorized::AggregateDataPtr* places,
-                                  vectorized::ColumnRawPtrs& key_columns, const size_t num_rows);
+    void _emplace_into_hash_table(vectorized::ColumnRawPtrs& key_columns, const size_t num_rows);
     Status _create_agg_status(vectorized::AggregateDataPtr data);
     size_t _get_hash_table_size();
 
@@ -108,7 +107,7 @@ private:
     bool _should_expand_hash_table = true;
     int64_t _cur_num_rows_returned = 0;
     std::unique_ptr<vectorized::Arena> _agg_arena_pool = nullptr;
-    AggregatedDataVariantsUPtr _agg_data = nullptr;
+    AggregatedDataVariantsUPtr _agg_data_variants = nullptr;
     std::vector<vectorized::AggFnEvaluator*> _aggregate_evaluators;
     // group by k1,k2
     vectorized::VExprContextSPtrs _probe_expr_ctxs;
@@ -132,6 +131,7 @@ private:
     struct Executor final : public ExecutorBase {
         Status get_result(StreamingAggLocalState* local_state, RuntimeState* state,
                           vectorized::Block* block, bool* eos) override {
+            LOG_INFO("WithoutKey: {}, NeedFinalize: {}", WithoutKey, NeedFinalize);
             if constexpr (WithoutKey) {
                 if constexpr (NeedFinalize) {
                     return local_state->_get_without_key_result(state, block, eos);
@@ -148,6 +148,7 @@ private:
         }
 
         Status execute(StreamingAggLocalState* local_state, vectorized::Block* block) override {
+            LOG_INFO("WithoutKey: {}, NeedToMerge: {}", WithoutKey, NeedToMerge);
             if constexpr (WithoutKey) {
                 if constexpr (NeedToMerge) {
                     return local_state->_merge_without_key(block);
@@ -205,7 +206,7 @@ private:
                                                                   vectorized::AggregateDataPtr>());
                                           }
                                       }},
-                _agg_data->method_variant);
+                _agg_data_variants->method_variant);
     }
 };
 

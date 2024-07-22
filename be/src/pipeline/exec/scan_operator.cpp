@@ -224,6 +224,7 @@ Status ScanLocalState<Derived>::_normalize_predicate(
         const vectorized::VExprSPtr& conjunct_expr_root, vectorized::VExprContext* context,
         vectorized::VExprSPtr& output_expr) {
     static constexpr auto is_leaf = [](auto&& expr) { return !expr->is_and_expr(); };
+
     auto in_predicate_checker = [](const vectorized::VExprSPtrs& children,
                                    std::shared_ptr<vectorized::VSlotRef>& slot,
                                    vectorized::VExprSPtr& child_contains_slot) {

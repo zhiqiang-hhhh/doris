@@ -575,6 +575,9 @@ Status StatefulOperatorX<LocalStateType>::get_block(RuntimeState* state, vectori
         RETURN_IF_ERROR(OperatorX<LocalStateType>::_child_x->get_block_after_projects(
                 state, local_state._child_block.get(), &local_state._child_eos));
         *eos = local_state._child_eos;
+        LOG_INFO("{} need more data, get block from child {}, got {} rows, eos {}",
+                 this->get_name(), OperatorX<LocalStateType>::_child_x->get_name(),
+                 local_state._child_block->rows(), *eos);
         if (local_state._child_block->rows() == 0 && !local_state._child_eos) {
             return Status::OK();
         }

@@ -201,6 +201,7 @@ public:
 
     int64_t memory_usage() const { return _arena_pool.size(); }
 
+    // Append key, return address of aggregate data
     template <typename KeyType>
     vectorized::AggregateDataPtr append_data(const KeyType& key) {
         DCHECK_EQ(sizeof(KeyType), _size_of_key);
@@ -325,10 +326,10 @@ private:
     std::vector<vectorized::AggregateDataPtr> _value_containers;
     vectorized::AggregateDataPtr _current_agg_data = nullptr;
     char* _current_keys = nullptr;
-    size_t _size_of_key {};
-    size_t _size_of_aggregate_states {};
-    uint32_t _index_in_sub_container {};
-    uint32_t _total_count {};
+    size_t _size_of_key = 0;
+    size_t _size_of_aggregate_states = 0;
+    uint32_t _index_in_sub_container = 0;
+    uint32_t _total_count = 0;
     bool _inited = false;
 };
 
