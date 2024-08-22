@@ -18,6 +18,7 @@
 #include "pipeline/exec/olap_scan_operator.h"
 
 #include <fmt/format.h>
+#include <thrift/protocol/TDebugProtocol.h>
 
 #include <memory>
 
@@ -237,6 +238,8 @@ bool OlapScanLocalState::_storage_no_merge() {
 }
 
 Status OlapScanLocalState::_init_scanners(std::list<vectorized::VScannerSPtr>* scanners) {
+    LOG_INFO("tablet ranges size: {}, conjunct {}", _scan_ranges.size(), _conjuncts.size());
+
     if (_scan_ranges.empty()) {
         _eos = true;
         _scan_dependency->set_ready();
@@ -252,6 +255,7 @@ Status OlapScanLocalState::_init_scanners(std::list<vectorized::VScannerSPtr>* s
                     message += ", ";
                 }
                 message += conjunct->root()->debug_string();
+                LOG_INFO("conjunct: {}", conjunct->root()->debug_string());
             }
         }
         _runtime_profile->add_info_string("RemainedDownPredicates", message);
@@ -275,22 +279,29 @@ Status OlapScanLocalState::_init_scanners(std::list<vectorized::VScannerSPtr>* s
     bool has_cpu_limit = state()->query_options().__isset.resource_limit &&
                          state()->query_options().resource_limit.__isset.cpu_limit;
 
-    std::vector<TabletWithVersion> tablets;
-    tablets.reserve(_scan_ranges.size());
+    std::vector<TabletWithVersion> tablet_with_version_vec;
+    LOG_INFO("_scan_ranges.size()={}, _cond_ranges.size()={}", _scan_ranges.size(),
+             _cond_ranges.size());
+    // print scan range
+    for (auto& scan_range : _scan_ranges) {
+        LOG_INFO("scan range: {}", apache::thrift::ThriftDebugString(*scan_range).c_str());
+    }
+
+    tablet_with_version_vec.reserve(_scan_ranges.size());
     for (auto&& scan_range : _scan_ranges) {
         // TODO(plat1ko): Get cloud tablet in parallel
         auto tablet = DORIS_TRY(ExecEnv::get_tablet(scan_range->tablet_id));
         int64_t version = 0;
         std::from_chars(scan_range->version.data(),
                         scan_range->version.data() + scan_range->version.size(), version);
-        tablets.emplace_back(std::move(tablet), version);
+        tablet_with_version_vec.emplace_back(std::move(tablet), version);
     }
     int64_t duration_ns = 0;
     if (config::is_cloud_mode()) {
         SCOPED_RAW_TIMER(&duration_ns);
         std::vector<std::function<Status()>> tasks;
         tasks.reserve(_scan_ranges.size());
-        for (auto&& [tablet, version] : tablets) {
+        for (auto&& [tablet, version] : tablet_with_version_vec) {
             tasks.emplace_back([tablet, version]() {
                 return std::dynamic_pointer_cast<CloudTablet>(tablet)->sync_rowsets(version);
             });
@@ -311,7 +322,7 @@ Status OlapScanLocalState::_init_scanners(std::list<vectorized::VScannerSPtr>* s
             key_ranges.emplace_back(range.get());
         }
 
-        ParallelScannerBuilder scanner_builder(this, tablets, _scanner_profile, key_ranges, state(),
+        ParallelScannerBuilder scanner_builder(this, tablet_with_version_vec, _scanner_profile, key_ranges, state(),
                                                p._limit, true, p._olap_scan_node.is_preaggregation);
 
         int max_scanners_count = state()->parallel_scan_max_scanners_count();
@@ -359,30 +370,42 @@ Status OlapScanLocalState::_init_scanners(std::list<vectorized::VScannerSPtr>* s
         return Status::OK();
     };
 
-    for (auto& scan_range : _scan_ranges) {
-        auto tablet = DORIS_TRY(ExecEnv::get_tablet(scan_range->tablet_id));
-        int64_t version = 0;
-        std::from_chars(scan_range->version.data(),
-                        scan_range->version.data() + scan_range->version.size(), version);
-        std::vector<std::unique_ptr<doris::OlapScanRange>>* ranges = &_cond_ranges;
+    for (auto& tablet_with_version : tablet_with_version_vec) {
+        auto tablet = tablet_with_version.tablet;
+        int64_t version = tablet_with_version.version;
+
+        std::vector<std::unique_ptr<doris::OlapScanRange>>* cond_ranges = &_cond_ranges;
         int size_based_scanners_per_tablet = 1;
 
         if (config::doris_scan_range_max_mb > 0) {
             size_based_scanners_per_tablet = std::max(
                     1, (int)(tablet->tablet_footprint() / (config::doris_scan_range_max_mb << 20)));
         }
+
         int ranges_per_scanner =
-                std::max(1, (int)ranges->size() /
+                std::max(1, (int)cond_ranges->size() /
                                     std::min(scanners_per_tablet, size_based_scanners_per_tablet));
-        int num_ranges = ranges->size();
+        int num_ranges = cond_ranges->size();
+
+        // print log to help me read code
+        LOG_INFO(
+                "tablet_id: {}, version: {}, ranges_per_scanner: {}, "
+                "size_based_scanners_per_tablet: {}, num_ranges: {}",
+                tablet->tablet_id(), version, ranges_per_scanner, size_based_scanners_per_tablet,
+                num_ranges);
+        for (const auto& sc : *cond_ranges) {
+            LOG_INFO("scan range: {}", sc->debug_string());
+        }
+
         for (int i = 0; i < num_ranges;) {
             std::vector<doris::OlapScanRange*> scanner_ranges;
-            scanner_ranges.push_back((*ranges)[i].get());
+            scanner_ranges.push_back((*cond_ranges)[i].get());
+            LOG_INFO("scanner range {} {}",i, scanner_ranges.back()->debug_string());
             ++i;
             for (int j = 1; i < num_ranges && j < ranges_per_scanner &&
-                            (*ranges)[i]->end_include == (*ranges)[i - 1]->end_include;
+                            (*cond_ranges)[i]->end_include == (*cond_ranges)[i - 1]->end_include;
                  ++j, ++i) {
-                scanner_ranges.push_back((*ranges)[i].get());
+                scanner_ranges.push_back((*cond_ranges)[i].get());
             }
             RETURN_IF_ERROR(build_new_scanner(tablet, version, scanner_ranges));
         }

@@ -180,6 +180,8 @@ Status OperatorXBase::init(const TPlanNode& tnode, RuntimeState* /*state*/) {
         }
     }
 
+    LOG_INFO("Operator {} init {} conjuncts", _op_name, _conjuncts.size());
+
     // create the projections expr
 
     if (tnode.__isset.projections) {

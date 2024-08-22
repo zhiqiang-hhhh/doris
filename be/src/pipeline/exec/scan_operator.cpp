@@ -183,7 +183,7 @@ Status ScanLocalState<Derived>::_normalize_conjuncts(RuntimeState* state) {
     }
 
     RETURN_IF_ERROR(_get_topn_filters(state));
-
+    LOG_INFO("1 _conjuncts: {}", _conjuncts.size());
     for (auto it = _conjuncts.begin(); it != _conjuncts.end();) {
         auto& conjunct = *it;
         if (conjunct->root()) {
@@ -205,6 +205,8 @@ Status ScanLocalState<Derived>::_normalize_conjuncts(RuntimeState* state) {
         }
         ++it;
     }
+    LOG_INFO("2 _conjuncts: {}, _stale_expr_ctxs {}, _common_expr_ctxs_push_down {}",
+             _conjuncts.size(), _stale_expr_ctxs.size(), _common_expr_ctxs_push_down.size());
     for (auto& it : _slot_id_to_value_range) {
         std::visit(
                 [&](auto&& range) {
@@ -225,6 +227,7 @@ Status ScanLocalState<Derived>::_normalize_predicate(
         const vectorized::VExprSPtr& conjunct_expr_root, vectorized::VExprContext* context,
         vectorized::VExprSPtr& output_expr) {
     static constexpr auto is_leaf = [](auto&& expr) { return !expr->is_and_expr(); };
+
     auto in_predicate_checker = [](const vectorized::VExprSPtrs& children,
                                    std::shared_ptr<vectorized::VSlotRef>& slot,
                                    vectorized::VExprSPtr& child_contains_slot) {
@@ -1209,6 +1212,7 @@ template <typename Derived>
 Status ScanLocalState<Derived>::_prepare_scanners() {
     std::list<vectorized::VScannerSPtr> scanners;
     RETURN_IF_ERROR(_init_scanners(&scanners));
+    LOG_INFO("Init scanners done, scanner size: {}", scanners.size());
     // Init scanner wrapper
     for (auto it = scanners.begin(); it != scanners.end(); ++it) {
         _scanners.emplace_back(std::make_shared<vectorized::ScannerDelegate>(*it));
@@ -1230,15 +1234,16 @@ template <typename Derived>
 Status ScanLocalState<Derived>::_start_scanners(
         const std::list<std::shared_ptr<vectorized::ScannerDelegate>>& scanners) {
     auto& p = _parent->cast<typename Derived::Parent>();
+    // 1. If data distribution is ignored , we use 1 instance to scan.
+    // 2. Else if this operator is not file scan operator, we use config::doris_scanner_thread_pool_thread_num scanners to scan.
+    // 3. Else, file scanner will consume much memory so we use config::doris_scanner_thread_pool_thread_num / query_parallel_instance_num scanners to scan.
+    const int num_parallel_instances = p.ignore_data_distribution() || !p.is_file_scan_operator()
+                                               ? 1
+                                               : state()->query_parallel_instance_num();
+
     _scanner_ctx = vectorized::ScannerContext::create_shared(
             state(), this, p._output_tuple_desc, p.output_row_descriptor(), scanners, p.limit(),
-            state()->scan_queue_mem_limit(), _scan_dependency,
-            // 1. If data distribution is ignored , we use 1 instance to scan.
-            // 2. Else if this operator is not file scan operator, we use config::doris_scanner_thread_pool_thread_num scanners to scan.
-            // 3. Else, file scanner will consume much memory so we use config::doris_scanner_thread_pool_thread_num / query_parallel_instance_num scanners to scan.
-            p.ignore_data_distribution() || !p.is_file_scan_operator()
-                    ? 1
-                    : state()->query_parallel_instance_num());
+            state()->scan_queue_mem_limit(), _scan_dependency, num_parallel_instances);
     return Status::OK();
 }
 
@@ -1385,6 +1390,7 @@ ScanOperatorX<LocalStateType>::ScanOperatorX(ObjectPool* pool, const TPlanNode& 
         : OperatorX<LocalStateType>(pool, tnode, operator_id, descs),
           _runtime_filter_descs(tnode.runtime_filters),
           _parallel_tasks(parallel_tasks) {
+    LOG_INFO("ScanOperator {} has {} conjuncts", node_id(), tnode.conjuncts.size());
     if (!tnode.__isset.conjuncts || tnode.conjuncts.empty()) {
         // Which means the request could be fullfilled in a single segment iterator request.
         if (tnode.limit > 0 && tnode.limit < 1024) {
