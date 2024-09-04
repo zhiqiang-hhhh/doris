@@ -246,7 +246,9 @@ ThreadPool::ThreadPool(const ThreadPoolBuilder& builder)
           _active_threads(0),
           _total_queued_tasks(0),
           _cgroup_cpu_ctl(builder._cgroup_cpu_ctl),
-          _tokenless(new_token(ExecutionMode::CONCURRENT)) {}
+          _tokenless(new_token(ExecutionMode::CONCURRENT)) {
+            LOG_INFO("ThreadPool {}, min_threads {}, _max_threads {}", _name, _min_threads, _max_threads);
+          }
 
 ThreadPool::~ThreadPool() {
     // There should only be one live token: the one used in tokenless submission.

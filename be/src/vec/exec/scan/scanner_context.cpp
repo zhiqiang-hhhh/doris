@@ -38,6 +38,8 @@ namespace doris::vectorized {
 
 using namespace std::chrono_literals;
 
+const int64_t MAX_TABLET = 10000;
+
 ScannerContext::ScannerContext(
         RuntimeState* state, pipeline::ScanLocalStateBase* local_state,
         const TupleDescriptor* output_tuple_desc, const RowDescriptor* output_row_descriptor,

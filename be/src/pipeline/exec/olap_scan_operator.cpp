@@ -19,6 +19,7 @@
 
 #include <fmt/format.h>
 
+#include <cstdint>
 #include <memory>
 
 #include "cloud/cloud_meta_mgr.h"
@@ -30,6 +31,7 @@
 #include "pipeline/common/runtime_filter_consumer.h"
 #include "pipeline/exec/scan_operator.h"
 #include "service/backend_options.h"
+#include "util/runtime_profile.h"
 #include "util/to_string.h"
 #include "vec/exec/scan/new_olap_scanner.h"
 #include "vec/exec/scan/vscan_node.h"
@@ -398,8 +400,8 @@ void OlapScanLocalState::set_scan_ranges(RuntimeState* state,
     for (auto& scan_range : scan_ranges) {
         DCHECK(scan_range.scan_range.__isset.palo_scan_range);
         _scan_ranges.emplace_back(new TPaloScanRange(scan_range.scan_range.palo_scan_range));
-        COUNTER_UPDATE(_tablet_counter, 1);
     }
+    COUNTER_SET(_tablet_counter,  static_cast<int64_t>(_scan_ranges.size()));
 }
 
 static std::string olap_filter_to_string(const doris::TCondition& condition) {
