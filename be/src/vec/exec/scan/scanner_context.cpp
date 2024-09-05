@@ -29,6 +29,7 @@
 #include "common/status.h"
 #include "pipeline/exec/scan_operator.h"
 #include "runtime/descriptors.h"
+#include "runtime/exec_env.h"
 #include "runtime/runtime_state.h"
 #include "util/uid_util.h"
 #include "vec/core/block.h"
@@ -88,6 +89,7 @@ ScannerContext::ScannerContext(
             _state->num_scanner_threads() > 0
                     ? _state->num_scanner_threads()
                     : config::doris_scanner_thread_pool_thread_num / num_parallel_instances;
+
     _max_thread_num = _max_thread_num == 0 ? 1 : _max_thread_num;
     // In some situation, there are not too many big tablets involed, so we can reduce the thread number.
     _max_thread_num = std::min(_max_thread_num, (int32_t)scanners.size());
@@ -117,9 +119,17 @@ ScannerContext::ScannerContext(
         }
     }
 
+    LOG_INFO(
+            "ScannerDebug, session {}, doris_scanner_thread_pool_thread_num {},  "
+            "num_parallel_instances {}, scanners {}, _max_thread_num {}",
+            _state->num_scanner_threads(), config::doris_scanner_thread_pool_thread_num,
+            num_parallel_instances, scanners.size(), _max_thread_num);
+
     _query_thread_context = {_query_id, _state->query_mem_tracker(),
                              _state->get_query_ctx()->workload_group()};
     _dependency = dependency;
+
+    DorisMetrics::instance()->scanner_ctx_cnt_dev->increment(1);
 }
 
 // After init function call, should not access _parent
@@ -205,6 +215,8 @@ void ScannerContext::submit_scan_task(std::shared_ptr<ScanTask> scan_task) {
     _scanner_sched_counter->update(1);
     _num_scheduled_scanners++;
     _scanner_scheduler->submit(shared_from_this(), scan_task);
+
+    // _scanner_scheduler->
 }
 
 void ScannerContext::append_block_to_queue(std::shared_ptr<ScanTask> scan_task) {

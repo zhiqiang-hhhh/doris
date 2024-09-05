@@ -1000,9 +1000,7 @@ Status ScanLocalState<Derived>::_start_scanners(
             // 1. If data distribution is ignored , we use 1 instance to scan.
             // 2. Else if this operator is not file scan operator, we use config::doris_scanner_thread_pool_thread_num scanners to scan.
             // 3. Else, file scanner will consume much memory so we use config::doris_scanner_thread_pool_thread_num / query_parallel_instance_num scanners to scan.
-            p.ignore_data_distribution() || !p.is_file_scan_operator()
-                    ? 1
-                    : state()->query_parallel_instance_num());
+            p.ignore_data_distribution() ? 1 : state()->query_parallel_instance_num());
     return Status::OK();
 }
 

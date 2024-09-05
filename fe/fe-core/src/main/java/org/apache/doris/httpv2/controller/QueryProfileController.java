@@ -54,8 +54,13 @@ public class QueryProfileController extends BaseController {
         if (profile == null) {
             return ResponseEntityBuilder.okWithCommonError("ID " + id + " does not exist");
         }
+        // Print time cost of profile replace.
+        long start = System.currentTimeMillis();
         profile = profile.replaceAll("\n", "</br>");
+        long end = System.currentTimeMillis();
+        LOG.info("Profile {} replace step 1 costs {} ms", id, end - start);
         profile = profile.replaceAll(" ", "&nbsp;&nbsp;");
+        LOG.info("Profile {} replace step 2 costs {} ms", id, System.currentTimeMillis() - end);
         return ResponseEntityBuilder.ok(profile);
     }
 

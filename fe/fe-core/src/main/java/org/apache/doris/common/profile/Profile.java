@@ -376,7 +376,9 @@ public class Profile {
             LOG.info("Profile {} has been stored to storage, reading it from storage", id);
 
             FileInputStream fileInputStream = null;
-
+            // Log the time cost of reading profile from storage
+            long startTime = System.currentTimeMillis();
+            long decompressCosts = 0;
             try {
                 fileInputStream = createPorfileFileInputStream(profileStoragePath);
                 if (fileInputStream == null) {
@@ -392,7 +394,9 @@ public class Profile {
                 byte[] binaryExecutionProfile = new byte[binarySize];
                 dataInput.readFully(binaryExecutionProfile, 0, binarySize);
                 // decompress binary execution profile
+                long decompressStartTime = System.currentTimeMillis();
                 String textExecutionProfile = decompressExecutionProfile(binaryExecutionProfile);
+                decompressCosts = System.currentTimeMillis() - decompressStartTime;
                 builder.append(textExecutionProfile);
                 return;
             } catch (Exception e) {
@@ -406,6 +410,10 @@ public class Profile {
                     } catch (Exception e) {
                         LOG.warn("Close profile {} failed", profileStoragePath, e);
                     }
+                }
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Read profile {} from storage {} costs {} ms, decompress costs {}", id, profileStoragePath,
+                            System.currentTimeMillis() - startTime, decompressCosts);
                 }
             }
 

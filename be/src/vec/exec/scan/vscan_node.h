@@ -29,7 +29,9 @@ class VSlotRef;
 class ScannerDelegate {
 public:
     VScannerSPtr _scanner;
-    ScannerDelegate(VScannerSPtr& scanner_ptr) : _scanner(scanner_ptr) {}
+    ScannerDelegate(VScannerSPtr& scanner_ptr) : _scanner(scanner_ptr) {
+        DorisMetrics::instance()->scanner_cnt_dev->increment(1);
+    }
     ~ScannerDelegate() {
         SCOPED_SWITCH_THREAD_MEM_TRACKER_LIMITER(_scanner->runtime_state()->query_mem_tracker());
         Status st = _scanner->close(_scanner->runtime_state());
@@ -37,6 +39,7 @@ public:
             LOG(WARNING) << "close scanner failed, st = " << st;
         }
         _scanner.reset();
+        DorisMetrics::instance()->scanner_cnt_dev->increment(-1);
     }
     ScannerDelegate(ScannerDelegate&&) = delete;
 };

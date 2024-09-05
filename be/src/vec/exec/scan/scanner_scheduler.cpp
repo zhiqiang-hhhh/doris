@@ -42,6 +42,7 @@
 #include "util/cpu_info.h"
 #include "util/defer_op.h"
 #include "util/doris_metrics.h"
+#include "util/metrics.h"
 #include "util/runtime_profile.h"
 #include "util/thread.h"
 #include "util/threadpool.h"
@@ -212,7 +213,12 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
     }
 
     ctx->update_peak_running_scanner(1);
-    Defer defer([&] { ctx->update_peak_running_scanner(-1); });
+    DorisMetrics::instance()->scanner_task_queued_dev->increment(-1);
+    DorisMetrics::instance()->scanner_task_running_dev->increment(1);
+    Defer defer([&] {
+        ctx->update_peak_running_scanner(-1);
+        DorisMetrics::instance()->scanner_task_running_dev->increment(-1);
+    });
 
     std::shared_ptr<ScannerDelegate> scanner_delegate = scan_task->scanner.lock();
     if (scanner_delegate == nullptr) {
