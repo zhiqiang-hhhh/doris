@@ -239,6 +239,7 @@ public:
     IntAtomicCounter* scanner_cnt_dev = nullptr;
     IntAtomicCounter* scanner_task_cnt_dev = nullptr;
     IntAtomicCounter* scanner_task_queued_dev = nullptr;
+    IntAtomicCounter* scanner_task_submit_failed_dev = nullptr;
     IntAtomicCounter* scanner_task_running_dev = nullptr;
 
     static DorisMetrics* instance() {

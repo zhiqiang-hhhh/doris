@@ -142,6 +142,13 @@ void ScannerScheduler::submit(std::shared_ptr<ScannerContext> ctx,
 
         scanner_delegate->_scanner->start_wait_worker_timer();
         auto s = ctx->thread_token->submit_func([scanner_ref = scan_task, ctx]() {
+
+            DorisMetrics::instance()->scanner_task_queued_dev->increment(-1);
+            DorisMetrics::instance()->scanner_task_running_dev->increment(1);
+            Defer metrics_defer([&] {
+                    DorisMetrics::instance()->scanner_task_running_dev->increment(-1);
+            });
+
             auto status = [&] {
                 RETURN_IF_CATCH_EXCEPTION(_scanner_scan(ctx, scanner_ref));
                 return Status::OK();
@@ -174,6 +181,12 @@ void ScannerScheduler::submit(std::shared_ptr<ScannerContext> ctx,
                         is_local ? _local_scan_thread_pool.get() : _remote_scan_thread_pool.get();
             }
             auto work_func = [scanner_ref = scan_task, ctx]() {
+                DorisMetrics::instance()->scanner_task_queued_dev->increment(-1);
+                DorisMetrics::instance()->scanner_task_running_dev->increment(1);
+                Defer metrics_defer([&] {
+                        DorisMetrics::instance()->scanner_task_running_dev->increment(-1);
+                });
+
                 auto status = [&] {
                     RETURN_IF_CATCH_EXCEPTION(_scanner_scan(ctx, scanner_ref));
                     return Status::OK();
@@ -192,6 +205,7 @@ void ScannerScheduler::submit(std::shared_ptr<ScannerContext> ctx,
             scan_task->set_status(Status::InternalError(
                     "Failed to submit scanner to scanner pool reason:" + std::string(ret.msg()) +
                     "|type:" + std::to_string(type)));
+            // Why?
             ctx->append_block_to_queue(scan_task);
             return;
         }
@@ -207,17 +221,15 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
                                      std::shared_ptr<ScanTask> scan_task) {
     // record the time from scanner submission to actual execution in nanoseconds
     ctx->incr_ctx_scheduling_time(GetCurrentTimeNanos() - scan_task->last_submit_time);
+
     auto task_lock = ctx->task_exec_ctx();
     if (task_lock == nullptr) {
         return;
     }
 
     ctx->update_peak_running_scanner(1);
-    DorisMetrics::instance()->scanner_task_queued_dev->increment(-1);
-    DorisMetrics::instance()->scanner_task_running_dev->increment(1);
-    Defer defer([&] {
+    Defer counter_defer([&] {
         ctx->update_peak_running_scanner(-1);
-        DorisMetrics::instance()->scanner_task_running_dev->increment(-1);
     });
 
     std::shared_ptr<ScannerDelegate> scanner_delegate = scan_task->scanner.lock();
