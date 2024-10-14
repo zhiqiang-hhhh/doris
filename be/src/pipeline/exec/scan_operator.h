@@ -224,10 +224,6 @@ protected:
             StringRef* constant_val, int* slot_ref_child,
             const std::function<bool(const std::string&)>& fn_checker, PushDownType& pdt);
 
-    virtual PushDownType _should_push_down_in_predicate(vectorized::VInPredicate* in_pred,
-                                                        vectorized::VExprContext* expr_ctx,
-                                                        bool is_not_in);
-
     virtual Status _should_push_down_function_filter(vectorized::VectorizedFnCall* fn_call,
                                                      vectorized::VExprContext* expr_ctx,
                                                      StringRef* constant_str,

@@ -28,6 +28,7 @@
 #include <memory>
 #include <numeric>
 #include <set>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -273,6 +274,25 @@ Status SegmentIterator::init(const StorageReadOptions& opts) {
     if (!status.ok() && !config::disable_segment_cache) {
         _segment->remove_from_segment_cache();
     }
+
+    std::string key_ranges_str;
+    for (auto& key_range : opts.key_ranges) {
+        std::string tmp = "";
+        tmp += key_range.include_lower ? "[" : "(";
+        tmp += fmt::format("{}", key_range.lower_key->to_string());
+        tmp += ", ";
+        tmp += fmt::format("{}", key_range.upper_key->to_string());
+        tmp += key_range.include_upper ? "]" : ")";
+        key_ranges_str += tmp;
+    }
+    std::string remaining_conjunct_roots_str;
+    for (auto& root : opts.remaining_conjunct_roots) {
+        remaining_conjunct_roots_str += root->expr_name() + ", ";
+    }
+
+    LOG_INFO("Init segment {} iterator, key_range: {}, remaining_conjunct: {}", this->segment_id(),
+             key_ranges_str, remaining_conjunct_roots_str);
+
     return status;
 }
 
@@ -285,11 +305,16 @@ Status SegmentIterator::_init_impl(const StorageReadOptions& opts) {
     _file_reader = _segment->_file_reader;
     _opts = opts;
     _col_predicates.clear();
-
+    LOG_INFO("StorageReadOptions column predicates size: {}", opts.column_predicates.size());
     for (const auto& predicate : opts.column_predicates) {
         if (!_segment->can_apply_predicate_safely(predicate->column_id(), predicate, *_schema,
                                                   _opts.io_ctx.reader_type)) {
+            LOG_INFO("Predicate {} can not be applied on segment {}", predicate->debug_string(),
+                     _segment->id());
             continue;
+        } else {
+            LOG_INFO("Predicate {} can be applied on segment {}", predicate->debug_string(),
+                     _segment->id());
         }
         _col_predicates.emplace_back(predicate);
     }
@@ -441,6 +466,7 @@ Status SegmentIterator::_get_row_ranges_by_keys() {
     // pre-condition: _row_ranges == [0, num_rows)
     size_t pre_size = _row_bitmap.cardinality();
     _row_bitmap = RowRanges::ranges_to_roaring(result_ranges);
+    LOG_INFO("opt.key_ranges size {}, row bitmap size {}", _opts.key_ranges.size(), _row_bitmap.cardinality());
     _opts.stats->rows_key_range_filtered += (pre_size - _row_bitmap.cardinality());
 
     return Status::OK();
@@ -1314,6 +1340,8 @@ Status SegmentIterator::_vec_init_lazy_materialization() {
     }
 
     // Step1: extract columns that can be lazy materialization
+    LOG_INFO("_col_predicates size: {}", _col_predicates.size());
+
     if (!_col_predicates.empty() || !del_cond_id_set.empty()) {
         std::set<ColumnId> short_cir_pred_col_id_set; // using set for distinct cid
         std::set<ColumnId> vec_pred_col_id_set;
@@ -1395,6 +1423,10 @@ Status SegmentIterator::_vec_init_lazy_materialization() {
         // has to check there is at least one predicate column
         for (auto cid : _schema->column_ids()) {
             if (!_is_pred_column[cid]) {
+                LOG_INFO(
+                        "Column {} is not predicate column, _is_need_vec_eval: {}, "
+                        "_is_need_short_eval {}",
+                        cid, _is_need_vec_eval, _is_need_short_eval);
                 if (_is_need_vec_eval || _is_need_short_eval) {
                     _lazy_materialization_read = true;
                 }
@@ -1452,6 +1484,21 @@ Status SegmentIterator::_vec_init_lazy_materialization() {
             }
         }
     }
+
+    std::string first_read_column_ids_str;
+    for (auto cid : _first_read_column_ids) {
+        first_read_column_ids_str += std::to_string(cid) + ",";
+    }
+    std::string second_read_column_ids_str;
+    for (auto cid : _second_read_column_ids) {
+        second_read_column_ids_str += std::to_string(cid) + ",";
+    }
+
+    LOG_INFO(
+            "Segment {} init lazy materialization. _lazy_materialization_read {}, "
+            "_first_read_column_ids {}, _second_read_column_ids {}",
+            this->segment_id(), _lazy_materialization_read, first_read_column_ids_str,
+            second_read_column_ids_str);
     return Status::OK();
 }
 
@@ -1645,8 +1692,7 @@ void SegmentIterator::_output_non_pred_columns(vectorized::Block* block) {
  * This approach optimizes reading performance by leveraging batch processing for continuous
  * rowid sequences and handling discontinuities gracefully in smaller chunks.
  */
-Status SegmentIterator::_read_columns_by_index(uint32_t nrows_read_limit, uint32_t& nrows_read,
-                                               bool set_block_rowid) {
+Status SegmentIterator::_read_columns_by_index(uint32_t nrows_read_limit, uint32_t& nrows_read) {
     SCOPED_RAW_TIMER(&_opts.stats->first_read_ns);
 
     nrows_read = _range_iter->read_batch_rowids(_block_rowids.data(), nrows_read_limit);
@@ -1654,6 +1700,7 @@ Status SegmentIterator::_read_columns_by_index(uint32_t nrows_read_limit, uint32
                          (_block_rowids[nrows_read - 1] - _block_rowids[0] == nrows_read - 1);
 
     for (auto cid : _first_read_column_ids) {
+        LOG_INFO("read column {} by index", cid);
         auto& column = _current_return_columns[cid];
         if (_no_need_read_key_data(cid, column, nrows_read)) {
             continue;
@@ -1675,7 +1722,7 @@ Status SegmentIterator::_read_columns_by_index(uint32_t nrows_read_limit, uint32
                                                                 col_name);
             }
         })
-
+        LOG_INFO("Column {} need read by index", cid);
         if (is_continuous) {
             size_t rows_read = nrows_read;
             _opts.stats->block_first_read_seek_num += 1;
@@ -1991,6 +2038,7 @@ Status SegmentIterator::_next_batch_internal(vectorized::Block* block) {
         if (_lazy_materialization_read || _opts.record_rowids || _is_need_expr_eval) {
             _block_rowids.resize(_opts.block_row_max);
         }
+        // 这里的 schema 是 tablets 的 schema，与查询涉及到的列无关。
         _current_return_columns.resize(_schema->columns().size());
         _converted_column_ids.resize(_schema->columns().size(), 0);
         if (_char_type_idx.empty() && _char_type_idx_no_0.empty()) {
@@ -2060,9 +2108,13 @@ Status SegmentIterator::_next_batch_internal(vectorized::Block* block) {
     _converted_column_ids.assign(_schema->columns().size(), 0);
 
     _current_batch_rows_read = 0;
-    RETURN_IF_ERROR(_read_columns_by_index(
-            nrows_read_limit, _current_batch_rows_read,
-            _lazy_materialization_read || _opts.record_rowids || _is_need_expr_eval));
+    // Block 的大小等于这次 scan 涉及到的所有的列的数量。
+    // select    FromTag    from    hits_10m    where    CounterID    in (4679)
+    // select    CounterID,FromTag    from    hits_10m    where    CounterID    in (4679)
+    // 这种情况下，block 的大小都是 2。
+    LOG_INFO("Block columns size {}, current_return_column size {}", block->columns(),
+             _current_return_columns.size());
+    RETURN_IF_ERROR(_read_columns_by_index(nrows_read_limit, _current_batch_rows_read));
     if (std::find(_first_read_column_ids.begin(), _first_read_column_ids.end(),
                   _schema->version_col_idx()) != _first_read_column_ids.end()) {
         _replace_version_col(_current_batch_rows_read);
@@ -2252,9 +2304,10 @@ Status SegmentIterator::_execute_common_expr(uint16_t* sel_rowid_idx, uint16_t& 
     size_t prev_columns = block->columns();
 
     vectorized::IColumn::Filter filter;
+    LOG_INFO("Before common expr filter, block rows {}", block->rows());
     RETURN_IF_ERROR(vectorized::VExprContext::execute_conjuncts_and_filter_block(
             _common_expr_ctxs_push_down, block, _columns_to_filter, prev_columns, filter));
-
+    LOG_INFO("After common expr filter, block rows {}", block->rows());
     selected_size = _evaluate_common_expr_filter(sel_rowid_idx, selected_size, filter);
     return Status::OK();
 }
@@ -2449,6 +2502,7 @@ bool SegmentIterator::_no_need_read_key_data(ColumnId cid, vectorized::MutableCo
     }
 
     if (!_opts.tablet_schema->column(cid).is_key()) {
+        LOG_INFO("Column {} is not key column", cid);
         return false;
     }
 

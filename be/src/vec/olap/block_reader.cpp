@@ -134,7 +134,8 @@ Status BlockReader::_init_collect_iter(const ReaderParams& read_params) {
     _is_rowsets_overlapping = _rowsets_overlapping(read_params);
     _vcollect_iter.init(this, _is_rowsets_overlapping, read_params.read_orderby_key,
                         read_params.read_orderby_key_reverse);
-
+    LOG_INFO("Collector iterator init finished, is_rowsets_overlapping: {}",
+             _is_rowsets_overlapping);
     std::vector<RowsetReaderSharedPtr> valid_rs_readers;
     RuntimeState* runtime_state = read_params.runtime_state;
 

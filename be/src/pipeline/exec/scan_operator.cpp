@@ -107,12 +107,22 @@ Status ScanLocalState<Derived>::open(RuntimeState* state) {
         RETURN_IF_ERROR(
                 p._common_expr_ctxs_push_down[i]->clone(state, _common_expr_ctxs_push_down[i]));
     }
+
     RETURN_IF_ERROR(_acquire_runtime_filter());
     _stale_expr_ctxs.resize(p._stale_expr_ctxs.size());
     for (size_t i = 0; i < _stale_expr_ctxs.size(); i++) {
         RETURN_IF_ERROR(p._stale_expr_ctxs[i]->clone(state, _stale_expr_ctxs[i]));
     }
+
+    LOG_INFO(
+            "[ScanOperatorOpen] _common_expr_ctxs_push_down size: {}, _conjuncts size {}, "
+            "_stale_expr_ctxs size {}",
+            _common_expr_ctxs_push_down.size(), _conjuncts.size(), _stale_expr_ctxs.size());
     RETURN_IF_ERROR(_process_conjuncts(state));
+    LOG_INFO(
+            "[ScanOperatorOpen] After normalize conjuncts _common_expr_ctxs_push_down size: {}, "
+            "_conjuncts size {}, _stale_expr_ctxs size {}",
+            _common_expr_ctxs_push_down.size(), _conjuncts.size(), _stale_expr_ctxs.size());
 
     auto status = _eos ? Status::OK() : _prepare_scanners();
     RETURN_IF_ERROR(status);
@@ -170,6 +180,7 @@ Status ScanLocalState<Derived>::_normalize_conjuncts(RuntimeState* state) {
         }
     };
 
+    // init _slot_id_to_value_range
     for (auto& slot : slots) {
         auto type = slot->type().type;
         if (slot->type().type == TYPE_ARRAY) {
@@ -188,6 +199,7 @@ Status ScanLocalState<Derived>::_normalize_conjuncts(RuntimeState* state) {
 
     RETURN_IF_ERROR(_get_topn_filters(state));
 
+    LOG_INFO("normalize {} conjunctions", _conjuncts.size());
     for (auto it = _conjuncts.begin(); it != _conjuncts.end();) {
         auto& conjunct = *it;
         if (conjunct->root()) {
@@ -201,8 +213,10 @@ Status ScanLocalState<Derived>::_normalize_conjuncts(RuntimeState* state) {
                     it = _conjuncts.erase(it);
                     continue;
                 }
-            } else { // All conjuncts are pushed down as predicate column
+            } else {
+                // All conjuncts are pushed down as predicate column
                 _stale_expr_ctxs.emplace_back(conjunct);
+                // Erase the conjunct from ScanOperator since this conjunct is pushed down
                 it = _conjuncts.erase(it);
                 continue;
             }
@@ -305,6 +319,7 @@ Status ScanLocalState<Derived>::_normalize_predicate(
                             RETURN_IF_PUSH_DOWN(_normalize_noneq_binary_predicate(
                                                         cur_expr, context, slot, value_range, &pdt),
                                                 status);
+
                             if (_is_key_column(slot->col_name())) {
                                 RETURN_IF_PUSH_DOWN(
                                         _normalize_bitmap_filter(cur_expr, context, slot, &pdt),
@@ -322,6 +337,12 @@ Status ScanLocalState<Derived>::_normalize_predicate(
                         *range);
                 RETURN_IF_ERROR(status);
             }
+            
+            if (slot != nullptr) {
+                LOG_INFO("PushDownType: {}, slot: {}, slot is key column {}", pdt, slot->col_name(),
+                     _is_key_column(slot->col_name()));
+            }
+
             if (pdt == PushDownType::ACCEPTABLE && slotref != nullptr &&
                 slotref->type().is_variant_type()) {
                 // remaining it in the expr tree, in order to filter by function if the pushdown
@@ -332,6 +353,7 @@ Status ScanLocalState<Derived>::_normalize_predicate(
 
             if (pdt == PushDownType::ACCEPTABLE &&
                 (_is_key_column(slot->col_name()) || _storage_no_merge())) {
+                // output_expr == nullptr means the predicate is pushed down
                 output_expr = nullptr;
                 return Status::OK();
             } else {
@@ -448,6 +470,8 @@ bool ScanLocalState<Derived>::_is_predicate_acting_on_slot(
         // not a slot ref(column)
         return false;
     }
+
+    LOG_INFO("Predicate {} is acting on a slot", expr->debug_string());
 
     auto entry = _slot_id_to_value_range.find(slot_ref->slot_id());
     if (_slot_id_to_value_range.end() == entry) {
@@ -594,8 +618,7 @@ Status ScanLocalState<Derived>::_normalize_in_and_eq_predicate(vectorized::VExpr
         } else {
             // normal in predicate
             vectorized::VInPredicate* pred = static_cast<vectorized::VInPredicate*>(expr);
-            PushDownType temp_pdt = _should_push_down_in_predicate(pred, expr_ctx, false);
-            if (temp_pdt == PushDownType::UNACCEPTABLE) {
+            if (pred->is_not_in()) {
                 return Status::OK();
             }
 
@@ -711,19 +734,12 @@ Status ScanLocalState<Derived>::_should_push_down_binary_predicate(
 }
 
 template <typename Derived>
-PushDownType ScanLocalState<Derived>::_should_push_down_in_predicate(
-        vectorized::VInPredicate* pred, vectorized::VExprContext* expr_ctx, bool is_not_in) {
-    if (pred->is_not_in() != is_not_in) {
-        return PushDownType::UNACCEPTABLE;
-    }
-    return PushDownType::ACCEPTABLE;
-}
-
-template <typename Derived>
 template <PrimitiveType T>
 Status ScanLocalState<Derived>::_normalize_not_in_and_not_eq_predicate(
         vectorized::VExpr* expr, vectorized::VExprContext* expr_ctx, SlotDescriptor* slot,
         ColumnValueRange<T>& range, PushDownType* pdt) {
+    LOG_INFO("Range {} is_fixed_range {}", range.column_name(), range.is_fixed_value_range());
+    // is_fixed_range == true means range.fixed_value is not empty.
     bool is_fixed_range = range.is_fixed_value_range();
     auto not_in_range = ColumnValueRange<T>::create_empty_column_value_range(
             range.column_name(), slot->is_nullable(), range.precision(), range.scale());
@@ -739,8 +755,8 @@ Status ScanLocalState<Derived>::_normalize_not_in_and_not_eq_predicate(
         }
 
         vectorized::VInPredicate* pred = static_cast<vectorized::VInPredicate*>(expr);
-        if ((temp_pdt = _should_push_down_in_predicate(pred, expr_ctx, true)) ==
-            PushDownType::UNACCEPTABLE) {
+        if (!pred->is_not_in()) {
+            LOG_INFO("Not in predicate should not be pushed down");
             return Status::OK();
         }
 
@@ -760,6 +776,7 @@ Status ScanLocalState<Derived>::_normalize_not_in_and_not_eq_predicate(
             _eos = true;
             _scan_dependency->set_ready();
         }
+        LOG_INFO("HybridSet size {}", state->hybrid_set->size());
         while (iter->has_next()) {
             // column not in (nullptr) is always true
             if (nullptr == iter->get_value()) {
@@ -772,6 +789,7 @@ Status ScanLocalState<Derived>::_normalize_not_in_and_not_eq_predicate(
             } else {
                 RETURN_IF_ERROR(_change_value_range<true>(
                         not_in_range, value, ColumnValueRange<T>::add_fixed_value_range, fn_name));
+                LOG_INFO("After add_fixed_value: {}", range.is_fixed_value_range());
             }
             iter->next();
         }

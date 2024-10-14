@@ -88,6 +88,7 @@ private:
 
     Status _build_key_ranges_and_filters();
 
+    // TODO: What is the difference of these four fields?
     std::vector<std::unique_ptr<TPaloScanRange>> _scan_ranges;
     std::vector<std::unique_ptr<doris::OlapScanRange>> _cond_ranges;
     OlapScanKeys _scan_keys;

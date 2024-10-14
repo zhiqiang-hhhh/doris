@@ -133,7 +133,14 @@ Status BetaRowsetReader::get_segment_iterators(RowsetReaderContext* read_context
             read_columns.push_back(cid);
         }
     }
-    VLOG_NOTICE << "read columns size: " << read_columns.size();
+
+    LOG_INFO(
+            "Get setgment iterators for rowset {}, _read_options.key_ranges.size: {}, read_columns "
+            "size {}, _read_context->predicates is null: {}, size {} ",
+            this->_rowset->rowset_id().to_string(), _read_options.key_ranges.size(),
+            _read_context->return_columns->size(), _read_context->predicates == nullptr,
+            _read_context->predicates == nullptr ? 0 : _read_context->predicates->size());
+
     _input_schema = std::make_shared<Schema>(_read_context->tablet_schema->columns(), read_columns);
     if (_read_context->predicates != nullptr) {
         _read_options.column_predicates.insert(_read_options.column_predicates.end(),

@@ -251,7 +251,7 @@ Status NewOlapScanner::_init_tablet_reader_params(
         const std::vector<FunctionFilter>& function_filters) {
     // if the table with rowset [0-x] or [0-1] [2-y], and [0-1] is empty
     const bool single_version = _tablet_reader_params.has_single_version();
-
+    LOG_INFO("Scanner init, key_ranges {}, filters {}", key_ranges.size(), filters.size());
     if (_state->skip_storage_engine_merge()) {
         _tablet_reader_params.direct_mode = true;
         _tablet_reader_params.aggregation = true;

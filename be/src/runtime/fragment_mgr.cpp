@@ -491,13 +491,13 @@ void FragmentMgr::coordinator_callback(const ReportStatusRequest& req) {
     TReportExecStatusResult res;
     Status rpc_status;
 
-    VLOG_DEBUG << "reportExecStatus params is "
-               << apache::thrift::ThriftDebugString(params).c_str();
-    if (!exec_status.ok()) {
-        LOG(WARNING) << "report error status: " << exec_status.msg()
-                     << " to coordinator: " << req.coord_addr
-                     << ", query id: " << print_id(req.query_id);
-    }
+    // VLOG_DEBUG << "reportExecStatus params is "
+    //            << apache::thrift::ThriftDebugString(params).c_str();
+    // if (!exec_status.ok()) {
+    //     LOG(WARNING) << "report error status: " << exec_status.msg()
+    //                  << " to coordinator: " << req.coord_addr
+    //                  << ", query id: " << print_id(req.query_id);
+    // }
     try {
         try {
             coord->reportExecStatus(res, params);

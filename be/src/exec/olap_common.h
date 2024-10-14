@@ -127,7 +127,7 @@ public:
 
     void convert_to_fixed_value();
 
-    void convert_to_range_value();
+    void convert_to_range_value(size_t max_scan_key_num);
 
     bool convert_to_avg_range_value(std::vector<OlapTuple>& begin_scan_keys,
                                     std::vector<OlapTuple>& end_scan_keys, bool& begin_include,
@@ -187,6 +187,8 @@ public:
     size_t get_fixed_value_size() const { return _fixed_values.size(); }
 
     void to_olap_filter(std::vector<TCondition>& filters) {
+        LOG_INFO("ColumnValueRange::to_olap_filter column_name: {}, is_fixed_value_range {}",
+                 _column_name, is_fixed_value_range());
         if (is_fixed_value_range()) {
             // 1. convert to in filter condition
             to_in_condition(filters, true);
@@ -702,7 +704,7 @@ bool ColumnValueRange<primitive_type>::convert_to_avg_range_value(
 }
 
 template <PrimitiveType primitive_type>
-void ColumnValueRange<primitive_type>::convert_to_range_value() {
+void ColumnValueRange<primitive_type>::convert_to_range_value(size_t max_scan_key_num) {
     if (!is_range_value_convertible()) {
         return;
     }
@@ -993,7 +995,7 @@ bool ColumnValueRange<primitive_type>::has_intersection(ColumnValueRange<primiti
 
 template <PrimitiveType primitive_type>
 Status OlapScanKeys::extend_scan_key(ColumnValueRange<primitive_type>& range,
-                                     int32_t max_scan_key_num, bool* exact_value, bool* eos,
+                                     int32_t max_scan_key_num, bool* range_is_converted, bool* eos,
                                      bool* should_break) {
     using CppType = typename PrimitiveTypeTraits<primitive_type>::CppType;
     using ConstIterator = typename std::set<CppType>::const_iterator;
@@ -1010,13 +1012,15 @@ Status OlapScanKeys::extend_scan_key(ColumnValueRange<primitive_type>& range,
         return Status::OK();
     }
 
-    //if a column doesn't have any predicate, we will try converting the range to fixed values
+    // If a column doesn't have any predicate, we will try converting the range to fixed values
     auto scan_keys_size = _begin_scan_keys.empty() ? 1 : _begin_scan_keys.size();
+    LOG_INFO("extend_scan_key, column_name: {}, max_scan_key_num: {}, scan_keys_size: {}",
+             range.column_name(), max_scan_key_num, scan_keys_size);
     if (range.is_fixed_value_range()) {
         if (range.get_fixed_value_size() > max_scan_key_num / scan_keys_size) {
             if (range.is_range_value_convertible()) {
-                range.convert_to_range_value();
-                *exact_value = false;
+                range.convert_to_range_value(max_scan_key_num / scan_keys_size);
+                *range_is_converted = true;
             } else {
                 *should_break = true;
                 return Status::OK();

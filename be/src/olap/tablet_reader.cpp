@@ -260,6 +260,10 @@ Status TabletReader::_capture_rs_readers(const ReaderParams& read_params) {
     _reader_context.output_columns = &read_params.output_columns;
     _reader_context.push_down_agg_type_opt = read_params.push_down_agg_type_opt;
     _reader_context.ttl_seconds = _tablet->ttl_seconds();
+    LOG_INFO(
+            "Table {} capture rowset readers, _reader_context is initialized, "
+            "lower_bound_keys.size {}",
+            _tablet->tablet_id(), _reader_context.lower_bound_keys->size());
 
     return Status::OK();
 }
@@ -325,7 +329,12 @@ Status TabletReader::_init_params(const ReaderParams& read_params) {
             }
         }
     }
-
+    LOG_INFO(
+            "Init tablet reader {} finished, keys params {}, col predicate size {}, "
+            "_value_col_predicates size {} ",
+            this->tablet()->tablet_id(),
+            this->_keys_param.to_string(), this->_col_predicates.size(),
+            this->_value_col_predicates.size());
     return res;
 }
 
@@ -454,8 +463,8 @@ Status TabletReader::_init_keys_param(const ReaderParams& read_params) {
         }
     }
 
-    //TODO:check the valid of start_key and end_key.(eg. start_key <= end_key)
-
+    //TODO: check the valid of start_key and end_key.(eg. start_key <= end_key)
+    LOG_INFO("Tablet read init, start_key size {}, end_key size {}", start_key_size, end_key_size);
     return Status::OK();
 }
 
@@ -487,6 +496,13 @@ Status TabletReader::_init_orderby_keys_param(const ReaderParams& read_params) {
 
 Status TabletReader::_init_conditions_param(const ReaderParams& read_params) {
     std::vector<ColumnPredicate*> predicates;
+
+    LOG_INFO("Tablet read init, conditions size {}", read_params.conditions.size());
+    LOG_INFO("Tablet read init, bloom_filters size {}", read_params.bloom_filters.size());
+    LOG_INFO("Tablet read init, bitmap_filters size {}", read_params.bitmap_filters.size());
+    LOG_INFO("Tablet read init, in_filters size {}", read_params.in_filters.size());
+    LOG_INFO("Tablet read init, function_filters size {}", read_params.function_filters.size());
+
     for (const auto& condition : read_params.conditions) {
         TCondition tmp_cond = condition;
         RETURN_IF_ERROR(_tablet_schema->have_column(tmp_cond.column_name));
@@ -552,10 +568,11 @@ Status TabletReader::_init_conditions_param(const ReaderParams& read_params) {
             }
         }
     }
-
+    LOG_INFO("Tablet read init, predicates size {}", predicates.size());
     for (auto* predicate : predicates) {
         auto column = _tablet_schema->column(predicate->column_id());
         if (column.aggregation() != FieldAggregationMethod::OLAP_FIELD_AGGREGATION_NONE) {
+            LOG_INFO("Add {} to _value_col_predicates", predicate->debug_string());
             _value_col_predicates.push_back(predicate);
         } else {
             _col_predicates.push_back(predicate);
