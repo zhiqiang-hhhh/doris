@@ -23,6 +23,7 @@
 
 #include "common/status.h"
 #include "util/doris_metrics.h"
+#include "util/metrics.h"
 #include "util/threadpool.h"
 #include "vec/exec/scan/vscanner.h"
 
@@ -211,11 +212,17 @@ public:
 
     std::vector<int> thread_debug_info() { return _scan_thread_pool->debug_info(); }
 
+    void read_lock() { _lock.lock_shared(); }
+    void read_unlock() { _lock.unlock_shared(); }
+    void write_lock() { _lock.lock(); }
+    void write_unlock() { _lock.unlock(); }
+
 private:
     std::unique_ptr<ThreadPool> _scan_thread_pool;
     std::atomic<bool> _is_stop;
     std::weak_ptr<CgroupCpuCtl> _cgroup_cpu_ctl;
     std::string _sched_name;
+    std::shared_mutex _lock;
 };
 
 } // namespace doris::vectorized
