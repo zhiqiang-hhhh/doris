@@ -340,11 +340,17 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
         eos = true;
     }
 
-    scanner->update_scan_cpu_timer();
     if (eos) {
         scanner->mark_to_need_to_close();
     }
     scan_task->set_eos(eos);
+    // 必须保证在 _dependency->set_ready(); 之前就执行该函数
+    ctx->decrease_scanner_scheduled();
+    VLOG_DEBUG << fmt::format(
+            "Scanner context {} has finished task, cached_block {} current scheduled task is "
+            "{}, eos: {}, status: {}",
+            ctx->ctx_id, scan_task->cached_blocks.size(), ctx->num_scheduled_scanners(), eos,
+            status.to_string());
     ctx->push_back_scan_task(scan_task);
 }
 
