@@ -296,7 +296,7 @@ Status ScannerContext::get_block_from_queue(RuntimeState* state, vectorized::Blo
         _set_scanner_done();
         return _process_status;
     }
-    
+
     std::shared_ptr<ScanTask> scan_task = nullptr;
 
     if (!_tasks_queue.empty()) {
