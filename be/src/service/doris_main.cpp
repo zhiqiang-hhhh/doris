@@ -425,6 +425,11 @@ int main(int argc, char** argv) {
                    << doris::config::spill_storage_root_path;
         exit(-1);
     }
+
+    // ExecEnv must be created before calleing doris::check_datapath_rw
+    // because will create metrics, it need an initialized DorisMetrics.
+    doris::ExecEnv* exec_env(doris::ExecEnv::GetInstance());
+
     std::set<std::string> broken_paths;
     doris::parse_conf_broken_store_paths(doris::config::broken_storage_path, &broken_paths);
 
@@ -526,7 +531,6 @@ int main(int argc, char** argv) {
     doris::ThreadLocalHandle::create_thread_local_if_not_exits();
 
     // init exec env
-    auto* exec_env(doris::ExecEnv::GetInstance());
     status = doris::ExecEnv::init(doris::ExecEnv::GetInstance(), paths, spill_paths, broken_paths);
     if (status != Status::OK()) {
         std::cerr << "failed to init doris storage engine, res=" << status;

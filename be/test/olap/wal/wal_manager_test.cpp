@@ -64,7 +64,7 @@ public:
         _env->_function_client_cache = new BrpcClientCache<PFunctionService_Stub>();
         _env->_stream_load_executor = StreamLoadExecutor::create_shared(_env);
         _env->_store_paths = {StorePath(std::filesystem::current_path(), 0)};
-        _env->_wal_manager = WalManager::create_shared(_env, wal_dir.string());
+        _env->_wal_manager = WalManager::create_unique(_env, wal_dir.string()).release();
         k_stream_load_begin_result = TLoadTxnBeginResult();
     }
     void TearDown() override {
@@ -155,9 +155,9 @@ TEST_F(WalManagerTest, recovery_normal) {
 }
 
 TEST_F(WalManagerTest, TestDynamicWalSpaceLimt) {
-    auto wal_mgr = WalManager::create_shared(_env, config::group_commit_wal_path);
+    auto wal_mgr = WalManager::create_unique(_env, config::group_commit_wal_path);
     static_cast<void>(wal_mgr->init());
-    _env->set_wal_mgr(wal_mgr);
+    _env->set_wal_mgr(wal_mgr.release());
 
     // 1T
     size_t available_bytes = 1099511627776;

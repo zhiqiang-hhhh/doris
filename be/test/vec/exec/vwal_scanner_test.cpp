@@ -286,7 +286,7 @@ void VWalScannerTest::init() {
     _env->_cluster_info->master_fe_addr.hostname = "host name";
     _env->_cluster_info->master_fe_addr.port = _backend_id;
     _env->_cluster_info->backend_id = 1001;
-    _env->_wal_manager = WalManager::create_shared(_env, _wal_dir);
+    _env->_wal_manager = WalManager::create_unique(_env, _wal_dir).release();
     std::string base_path;
     auto st = _env->_wal_manager->_init_wal_dirs_info();
     st = _env->_wal_manager->create_wal_path(_db_id, _tb_id, _txn_id_1, _label_1, base_path,

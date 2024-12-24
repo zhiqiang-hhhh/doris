@@ -38,7 +38,9 @@
 
 namespace doris {
 
-ExecEnv::ExecEnv() = default;
+ExecEnv::ExecEnv() {
+    _doris_metrics = std::make_unique<DorisMetrics>();
+}
 
 ExecEnv::~ExecEnv() {
     destroy();

@@ -45,6 +45,7 @@ class MemoryPool;
 }
 
 namespace doris {
+class DorisMetrics;
 namespace vectorized {
 class VDataStreamMgr;
 class ScannerScheduler;
@@ -257,7 +258,7 @@ public:
     vectorized::ScannerScheduler* scanner_scheduler() { return _scanner_scheduler; }
     FileMetaCache* file_meta_cache() { return _file_meta_cache; }
     MemTableMemoryLimiter* memtable_memory_limiter() { return _memtable_memory_limiter.get(); }
-    WalManager* wal_mgr() { return _wal_manager.get(); }
+    WalManager* wal_mgr() { return _wal_manager; }
     DNSCache* dns_cache() { return _dns_cache; }
     WriteCooldownMetaExecutors* write_cooldown_meta_executors() {
         return _write_cooldown_meta_executors.get();
@@ -294,7 +295,7 @@ public:
     void set_routine_load_task_executor(RoutineLoadTaskExecutor* r) {
         this->_routine_load_task_executor = r;
     }
-    void set_wal_mgr(std::shared_ptr<WalManager> wm) { this->_wal_manager = wm; }
+    void set_wal_mgr(WalManager* wm) { this->_wal_manager = wm; }
     void set_dummy_lru_cache(std::shared_ptr<DummyLRUCache> dummy_lru_cache) {
         this->_dummy_lru_cache = dummy_lru_cache;
     }
@@ -349,6 +350,8 @@ public:
 
     bool check_auth_token(const std::string& auth_token);
 
+    DorisMetrics* doris_metrics() { return _doris_metrics.get(); }
+
 private:
     ExecEnv();
 
@@ -359,9 +362,6 @@ private:
 
     Status _init_mem_env();
     Status _check_deploy_mode();
-
-    void _register_metrics();
-    void _deregister_metrics();
 
     inline static std::atomic_bool _s_ready {false};
     inline static std::atomic_bool _s_tracking_memory {false};
@@ -446,7 +446,7 @@ private:
     std::unique_ptr<MemTableMemoryLimiter> _memtable_memory_limiter;
     std::unique_ptr<LoadStreamMapPool> _load_stream_map_pool;
     std::unique_ptr<vectorized::DeltaWriterV2Pool> _delta_writer_v2_pool;
-    std::shared_ptr<WalManager> _wal_manager;
+    WalManager* _wal_manager = nullptr;
     DNSCache* _dns_cache = nullptr;
     std::unique_ptr<WriteCooldownMetaExecutors> _write_cooldown_meta_executors;
 
@@ -488,6 +488,8 @@ private:
 
     orc::MemoryPool* _orc_memory_pool = nullptr;
     arrow::MemoryPool* _arrow_memory_pool = nullptr;
+
+    std::unique_ptr<DorisMetrics> _doris_metrics;
 };
 
 template <>

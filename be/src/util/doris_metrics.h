@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 
+#include "runtime/exec_env.h"
 #include "util/jvm_metrics.h"
 #include "util/metrics.h"
 #include "util/system_metrics.h"
@@ -47,6 +48,10 @@ namespace doris {
 
 class DorisMetrics {
 public:
+    DorisMetrics();
+
+    static DorisMetrics* instance() { return ExecEnv::GetInstance()->doris_metrics(); }
+
     IntCounter* fragment_requests_total = nullptr;
     IntCounter* fragment_request_duration_us = nullptr;
     IntCounter* query_scan_bytes = nullptr;
@@ -197,13 +202,6 @@ public:
     UIntGauge* query_cache_sql_total_count = nullptr;
     UIntGauge* query_cache_partition_total_count = nullptr;
 
-    UIntGauge* scanner_thread_pool_queue_size = nullptr;
-    UIntGauge* add_batch_task_queue_size = nullptr;
-    UIntGauge* send_batch_thread_pool_thread_num = nullptr;
-    UIntGauge* send_batch_thread_pool_queue_size = nullptr;
-    UIntGauge* fragment_thread_pool_queue_size = nullptr;
-    UIntGauge* fragment_thread_pool_num_active_threads = nullptr;
-
     // Upload metrics
     UIntGauge* upload_total_byte = nullptr;
     IntCounter* upload_rowset_count = nullptr;
@@ -224,18 +222,6 @@ public:
     UIntGauge* arrow_flight_work_pool_max_queue_size = nullptr;
     UIntGauge* arrow_flight_work_max_threads = nullptr;
 
-    UIntGauge* flush_thread_pool_queue_size = nullptr;
-    UIntGauge* flush_thread_pool_thread_num = nullptr;
-
-    UIntGauge* local_scan_thread_pool_queue_size = nullptr;
-    UIntGauge* local_scan_thread_pool_thread_num = nullptr;
-    UIntGauge* remote_scan_thread_pool_queue_size = nullptr;
-    UIntGauge* remote_scan_thread_pool_thread_num = nullptr;
-    UIntGauge* limited_scan_thread_pool_queue_size = nullptr;
-    UIntGauge* limited_scan_thread_pool_thread_num = nullptr;
-    UIntGauge* group_local_scan_thread_pool_queue_size = nullptr;
-    UIntGauge* group_local_scan_thread_pool_thread_num = nullptr;
-
     IntCounter* num_io_bytes_read_total = nullptr;
     IntCounter* num_io_bytes_read_from_cache = nullptr;
     IntCounter* num_io_bytes_read_from_remote = nullptr;
@@ -244,14 +230,6 @@ public:
     IntCounter* scanner_ctx_cnt = nullptr;
     IntCounter* scanner_cnt = nullptr;
     IntCounter* scanner_task_cnt = nullptr;
-    IntCounter* scanner_task_queued = nullptr;
-    IntCounter* scanner_task_submit_failed = nullptr;
-    IntCounter* scanner_task_running = nullptr;
-
-    static DorisMetrics* instance() {
-        static DorisMetrics instance;
-        return &instance;
-    }
 
     // not thread-safe, call before calling metrics
     void initialize(
@@ -266,14 +244,10 @@ public:
     void init_jvm_metrics(JNIEnv* env);
 
 private:
-    // Don't allow constructor
-    DorisMetrics();
-
     void _update();
     void _update_process_thread_num();
     void _update_process_fd_num();
 
-private:
     static const std::string _s_registry_name;
     static const std::string _s_hook_name;
 
