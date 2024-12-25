@@ -34,6 +34,7 @@
 #include "pipeline/common/set_utils.h"
 #include "pipeline/exec/data_queue.h"
 #include "pipeline/exec/join/process_hash_table_probe.h"
+#include "util/doris_metrics.h"
 #include "util/stack_util.h"
 #include "vec/common/sort/partition_sorter.h"
 #include "vec/common/sort/sorter.h"
@@ -210,7 +211,10 @@ public:
                        std::shared_ptr<RuntimeFilterDependency> parent)
             : _parent(std::move(parent)),
               _registration_time(registration_time),
-              _wait_time_ms(wait_time_ms) {}
+              _wait_time_ms(wait_time_ms) {
+        DorisMetrics::instance()->runtime_filter_timer_count->increment(1);
+    }
+    ~RuntimeFilterTimer() { DorisMetrics::instance()->runtime_filter_timer_count->increment(-1); }
 
     // Called by runtime filter producer.
     void call_ready();

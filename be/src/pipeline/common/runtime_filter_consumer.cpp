@@ -49,6 +49,7 @@ void RuntimeFilterConsumer::_init_profile(RuntimeProfile* profile) {
 
 Status RuntimeFilterConsumer::_register_runtime_filter(bool need_local_merge) {
     int filter_size = _runtime_filter_descs.size();
+    LOG_INFO("Register runtime filter, filter size: {}", filter_size);
     _runtime_filter_ctxs.reserve(filter_size);
     _runtime_filter_ready_flag.reserve(filter_size);
     for (int i = 0; i < filter_size; ++i) {

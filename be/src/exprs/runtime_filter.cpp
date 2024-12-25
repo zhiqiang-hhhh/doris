@@ -47,6 +47,7 @@
 #include "runtime/runtime_filter_mgr.h"
 #include "util/bitmap_value.h"
 #include "util/brpc_client_cache.h"
+#include "util/doris_metrics.h"
 #include "util/ref_count_closure.h"
 #include "util/runtime_profile.h"
 #include "util/string_parser.hpp"
@@ -1267,9 +1268,11 @@ void IRuntimeFilter::update_state() {
     auto expected = _rf_state_atomic.load(std::memory_order_acquire);
     // In pipelineX, runtime filters will be ready or timeout before open phase.
     if (expected == RuntimeFilterState::NOT_READY) {
-        DCHECK(MonotonicMillis() - registration_time_ >= wait_times_ms);
-        COUNTER_SET(_wait_timer,
-                    int64_t((MonotonicMillis() - registration_time_) * NANOS_PER_MILLIS));
+        const int64_t wait_time = MonotonicMillis() - registration_time_;
+        DCHECK(wait_time >= wait_times_ms);
+        DorisMetrics::instance()->wait_runtime_filter_costs_ms_in_last_1000_times->set_value(
+                wait_time);
+        COUNTER_SET(_wait_timer, int64_t((wait_time)*NANOS_PER_MILLIS));
         _rf_state_atomic = RuntimeFilterState::TIME_OUT;
     }
 }

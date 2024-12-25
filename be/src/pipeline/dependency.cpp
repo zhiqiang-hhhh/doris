@@ -107,10 +107,12 @@ std::string RuntimeFilterDependency::debug_string(int indentation_level) {
 }
 
 void RuntimeFilterTimer::call_timeout() {
+    DorisMetrics::instance()->runtime_filter_timeout_count->increment(1);
     _parent->set_ready();
 }
 
 void RuntimeFilterTimer::call_ready() {
+    DorisMetrics::instance()->runtime_filter_arrive_intime_count->increment(1);
     _parent->set_ready();
 }
 

@@ -240,6 +240,11 @@ public:
     IntCounter* num_io_bytes_read_from_cache = nullptr;
     IntCounter* num_io_bytes_read_from_remote = nullptr;
 
+    IntCounter* wait_runtime_filter_costs_ms_in_last_1000_times = nullptr;
+    IntCounter* runtime_filter_arrive_intime_count = nullptr;
+    IntCounter* runtime_filter_timeout_count = nullptr;
+    IntCounter* runtime_filter_timer_count = nullptr;
+
     IntCounter* query_ctx_cnt = nullptr;
     IntCounter* scanner_ctx_cnt = nullptr;
     IntCounter* scanner_cnt = nullptr;
