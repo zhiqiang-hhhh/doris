@@ -591,6 +591,13 @@ std::shared_ptr<ScanTask> ScannerContext::pull_next_scan_task(
         return nullptr;
     }
 
+    if (_block_memory_usage >= _max_bytes_in_queue / 2) {
+        VLOG_DEBUG << fmt::format(
+                "ScannerContext {} block memory usage {} >= _max_bytes_in_queue/2 {}/2={}, skip pull",
+                ctx_id, _block_memory_usage, _max_bytes_in_queue, _max_bytes_in_queue / 2);
+        return nullptr;
+    }
+
     if (current_scan_task != nullptr) {
         if (current_scan_task->cached_blocks.empty() && !current_scan_task->is_eos()) {
             return current_scan_task;
