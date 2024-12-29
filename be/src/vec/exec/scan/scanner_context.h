@@ -112,7 +112,7 @@ public:
                    const RowDescriptor* output_row_descriptor,
                    const std::list<std::shared_ptr<vectorized::ScannerDelegate>>& scanners,
                    int64_t limit_, std::shared_ptr<pipeline::Dependency> dependency,
-                   bool ignore_data_distribution, bool is_file_scan_operator);
+                   bool is_serial_operator, bool is_file_scan_operator);
 
     ~ScannerContext() override {
         SCOPED_SWITCH_THREAD_MEM_TRACKER_LIMITER(_query_thread_context.query_mem_tracker);
@@ -227,7 +227,7 @@ protected:
     RuntimeProfile::Counter* _scale_up_scanners_counter = nullptr;
     QueryThreadContext _query_thread_context;
     std::shared_ptr<pipeline::Dependency> _dependency = nullptr;
-    bool _ignore_data_distribution = false;
+    bool _is_serial_operator = false;
     bool _is_file_scan_operator = false;
 
     std::atomic<int64_t> _block_memory_usage = 0;

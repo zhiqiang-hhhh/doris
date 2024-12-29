@@ -54,7 +54,7 @@ ScannerContext::ScannerContext(
         RuntimeState* state, pipeline::ScanLocalStateBase* local_state,
         const TupleDescriptor* output_tuple_desc, const RowDescriptor* output_row_descriptor,
         const std::list<std::shared_ptr<vectorized::ScannerDelegate>>& scanners, int64_t limit_,
-        std::shared_ptr<pipeline::Dependency> dependency, bool ignore_data_distribution,
+        std::shared_ptr<pipeline::Dependency> dependency, bool is_serial_operator,
         bool is_file_scan_operator)
         : HasTaskExecutionCtx(state),
           _state(state),
@@ -67,7 +67,7 @@ ScannerContext::ScannerContext(
           limit(limit_),
           _scanner_scheduler_global(state->exec_env()->scanner_scheduler()),
           _all_scanners(scanners.begin(), scanners.end()),
-          _ignore_data_distribution(ignore_data_distribution),
+          _is_serial_operator(is_serial_operator),
           _is_file_scan_operator(is_file_scan_operator),
           _min_concurrency_of_scan_scheduler(_state->min_scan_concurrency_of_scan_scheduler()),
           _min_concurrency(_state->min_scan_concurrency_of_scanner()) {
@@ -158,12 +158,8 @@ Status ScannerContext::init() {
     // At the same time, we dont want too many tasks are queued by scheduler, that is not necessary.
     _max_concurrency = _state->num_scanner_threads() > 0 ? _state->num_scanner_threads() : 0;
     if (_max_concurrency == 0) {
-        // NOTE: When ignore_data_distribution is true, the parallelism
-        // of the scan operator is regarded as 1 (actually maybe not).
-        // That will make the number of scan task can be submitted to the scheduler
-        // in a vary large value. This logicl is kept from the older implementation.
-        if (_ignore_data_distribution) {
-            _max_concurrency = config::doris_scanner_thread_pool_thread_num / 1;
+        if (_is_serial_operator) {
+            _max_concurrency = _min_concurrency_of_scan_scheduler;
         } else {
             const size_t factor = _is_file_scan_operator ? 1 : 4;
             _max_concurrency = factor * (config::doris_scanner_thread_pool_thread_num /
@@ -180,7 +176,9 @@ Status ScannerContext::init() {
     // In assumption that _state->query_parallel_instance_num() is equal to the number of scan operators.
     // Each scan operator can submit _basic_margin scanner to scheduelr if scheduler has enough resource.
     // So that for a single query, we can make sure it could make full utilization of the resource.
-    _basic_margin = _min_concurrency_of_scan_scheduler / (_state->query_parallel_instance_num());
+    _basic_margin = _is_serial_operator ? _max_concurrency
+                                        : _min_concurrency_of_scan_scheduler /
+                                                  (_state->query_parallel_instance_num());
     _basic_margin = std::min(_basic_margin, _max_concurrency);
 
     // For select * from table limit 10; should just use one thread.
@@ -593,7 +591,8 @@ std::shared_ptr<ScanTask> ScannerContext::pull_next_scan_task(
 
     if (_block_memory_usage >= _max_bytes_in_queue / 2) {
         VLOG_DEBUG << fmt::format(
-                "ScannerContext {} block memory usage {} >= _max_bytes_in_queue/2 {}/2={}, skip pull",
+                "ScannerContext {} block memory usage {} >= _max_bytes_in_queue/2 {}/2={}, skip "
+                "pull",
                 ctx_id, _block_memory_usage, _max_bytes_in_queue, _max_bytes_in_queue / 2);
         return nullptr;
     }
