@@ -28,7 +28,6 @@
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
-#include <type_traits>
 
 #include "common/object_pool.h"
 #include "util/container_util.hpp"

@@ -350,7 +350,7 @@ public:
     // relative to the parent.
     // If location is non-null, child will be inserted after location.  Location must
     // already be added to the profile.
-    void add_child(RuntimeProfile* child, bool indent, RuntimeProfile* location);
+    void add_child(RuntimeProfile* child, bool indent, RuntimeProfile* location = nullptr);
 
     void insert_child_head(RuntimeProfile* child, bool indent);
 
@@ -556,9 +556,6 @@ private:
     // All top level counters are the child of "" (root).
     using ChildCounterMap = std::map<std::string, std::set<std::string>>;
     ChildCounterMap _child_counter_map;
-
-    // A set of bucket counters registered in this runtime profile.
-    std::set<std::vector<Counter*>*> _bucketing_counters;
 
     // protects _counter_map, _counter_child_map and _bucketing_counters
     mutable std::mutex _counter_map_lock;
