@@ -280,6 +280,7 @@ void ScannerContext::push_back_scan_task(std::shared_ptr<ScanTask> scan_task) {
         _process_status = scan_task->get_status();
     }
     _tasks_queue.push_back(scan_task);
+    DorisMetrics::instance()->scanner_context_cached_task_queue_size->increment(1);
     _num_scheduled_scanners--;
 
     _dependency->set_ready();
@@ -320,6 +321,7 @@ Status ScannerContext::get_block_from_queue(RuntimeState* state, vectorized::Blo
         if (!scan_task->cached_blocks.empty()) {
             auto [current_block, block_size] = std::move(scan_task->cached_blocks.front());
             scan_task->cached_blocks.pop_front();
+            DorisMetrics::instance()->scanner_context_cached_block_cnt->increment(-1);
             _block_memory_usage -= block_size;
             // consume current block
             block->swap(*current_block);
@@ -336,6 +338,7 @@ Status ScannerContext::get_block_from_queue(RuntimeState* state, vectorized::Blo
             // All Cached blocks are consumed, pop this task from task_queue.
             if (!_tasks_queue.empty()) {
                 _tasks_queue.pop_front();
+                DorisMetrics::instance()->scanner_context_cached_task_queue_size->increment(-1);
             }
 
             if (scan_task->is_eos()) {
@@ -402,6 +405,7 @@ void ScannerContext::stop_scanners(RuntimeState* state) {
             sc->_scanner->try_stop();
         }
     }
+    DorisMetrics::instance()->scanner_context_cached_task_queue_size->increment(-_tasks_queue.size());
     _tasks_queue.clear();
     // TODO yiguolei, call mark close to scanners
     if (state->enable_profile()) {

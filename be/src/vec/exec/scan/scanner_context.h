@@ -67,6 +67,7 @@ public:
 
     ~ScanTask() {
         SCOPED_SWITCH_THREAD_MEM_TRACKER_LIMITER(_query_thread_context.query_mem_tracker);
+        DorisMetrics::instance()->scanner_context_cached_block_cnt->increment(-cached_blocks.size());
         cached_blocks.clear();
         DorisMetrics::instance()->scanner_task_cnt->increment(-1);
     }

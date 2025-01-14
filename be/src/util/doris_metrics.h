@@ -225,6 +225,12 @@ public:
     IntCounter* scanner_ctx_cnt = nullptr;
     IntCounter* scanner_cnt = nullptr;
     IntCounter* scanner_task_cnt = nullptr;
+    IntCounter* scanner_context_cached_block_cnt = nullptr;
+    IntCounter* scanner_context_cached_task_queue_size = nullptr;
+    IntCounter* scanner_get_null_free_block_cnt = nullptr;
+
+    DoubleGauge* scan_operator_get_block_from_queue_time = nullptr;
+    DoubleGauge* scanner_get_block_costs = nullptr;
 
     static DorisMetrics* instance() {
         static DorisMetrics instance;

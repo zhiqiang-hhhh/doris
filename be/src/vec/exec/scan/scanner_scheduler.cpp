@@ -246,6 +246,7 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
                 }
                 BlockUPtr free_block = ctx->get_free_block(first_read);
                 if (free_block == nullptr) {
+                    DorisMetrics::instance()->scanner_get_null_free_block_cnt->increment(1);
                     break;
                 }
                 // We got a new created block or a reused block.
