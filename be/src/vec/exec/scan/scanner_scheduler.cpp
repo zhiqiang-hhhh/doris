@@ -37,6 +37,8 @@
 #include "util/async_io.h" // IWYU pragma: keep
 #include "util/cpu_info.h"
 #include "util/defer_op.h"
+#include "util/doris_metrics.h"
+#include "util/stopwatch.hpp"
 #include "util/thread.h"
 #include "util/threadpool.h"
 #include "vec/core/block.h"
@@ -235,7 +237,10 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
 
             size_t raw_bytes_threshold = config::doris_scanner_row_bytes;
             size_t raw_bytes_read = 0; bool first_read = true; int64_t limit = scanner->limit();
+            MonotonicStopWatch watch0; watch0.start();
             while (!eos && raw_bytes_read < raw_bytes_threshold) {
+                MonotonicStopWatch watch;
+                watch.start();
                 if (UNLIKELY(ctx->done())) {
                     eos = true;
                     break;
@@ -250,7 +255,15 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
                     break;
                 }
                 // We got a new created block or a reused block.
-                status = scanner->get_block_after_projects(state, free_block.get(), &eos);
+                {
+                    MonotonicStopWatch watch1;
+                    watch1.start();
+                    status = scanner->get_block_after_projects(state, free_block.get(), &eos);
+                    VLOG_DEBUG << fmt::format("Scanner get block costs: {}",
+                                              watch1.elapsed_time() / 1000000);
+                    DorisMetrics::instance()->scanner_do_real_task_stats->add(
+                            watch1.elapsed_time());
+                }
                 first_read = false;
                 if (!status.ok()) {
                     LOG(WARNING) << "Scan thread read VScanner failed: " << status.to_string();
@@ -258,10 +271,15 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
                 }
                 // Projection will truncate useless columns, makes block size change.
                 auto free_block_bytes = free_block->allocated_bytes();
+                DorisMetrics::instance()->scanner_context_cached_block_size->increment(
+                        free_block_bytes);
                 raw_bytes_read += free_block_bytes;
+
                 if (!scan_task->cached_blocks.empty() &&
                     scan_task->cached_blocks.back().first->rows() + free_block->rows() <=
                             ctx->batch_size()) {
+                    MonotonicStopWatch watch2;
+                    watch2.start();
                     size_t block_size = scan_task->cached_blocks.back().first->allocated_bytes();
                     vectorized::MutableBlock mutable_block(
                             scan_task->cached_blocks.back().first.get());
@@ -279,10 +297,14 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
                     ctx->return_free_block(std::move(free_block));
                     ctx->inc_block_usage(scan_task->cached_blocks.back().first->allocated_bytes() -
                                          block_size);
+                    DorisMetrics::instance()->scanner_merge_block_costs_stat->add(
+                            watch2.elapsed_time());
                 } else {
-                    ctx->inc_block_usage(free_block->allocated_bytes());
+                    ctx->inc_block_usage(free_block_bytes);
                     scan_task->cached_blocks.emplace_back(std::move(free_block), free_block_bytes);
+                    DorisMetrics::instance()->scanner_context_cached_block_cnt->increment(1);
                 }
+
                 if (limit > 0 && limit < ctx->batch_size()) {
                     // If this scanner has limit, and less than batch size,
                     // return immediately and no need to wait raw_bytes_threshold.
@@ -294,8 +316,11 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
                     // to avoid user specify a large limit and causing too much small blocks.
                     break;
                 }
-            } // end for while
 
+                DorisMetrics::instance()->scanner_get_block_stats->add(watch.elapsed_time());
+            } // end for while
+            VLOG_DEBUG
+            << fmt::format("Get block for loop costs {}", watch0.elapsed_time() / 1000000);
             if (UNLIKELY(!status.ok())) {
                 scan_task->set_status(status);
                 eos = true;

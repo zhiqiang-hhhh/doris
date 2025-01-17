@@ -42,7 +42,7 @@
 #include "runtime/runtime_state.h"
 #include "util/doris_metrics.h"
 #include "util/runtime_profile.h"
-#include "util/time.h"
+#include "util/stopwatch.hpp"
 #include "util/uid_util.h"
 #include "vec/core/block.h"
 #include "vec/exec/scan/scanner_scheduler.h"
@@ -51,6 +51,19 @@
 namespace doris::vectorized {
 
 using namespace std::chrono_literals;
+
+ScanTask::~ScanTask() {
+    SCOPED_SWITCH_THREAD_MEM_TRACKER_LIMITER(_query_thread_context.query_mem_tracker);
+    DorisMetrics::instance()->scanner_context_cached_block_cnt->increment(-cached_blocks.size());
+    for (auto& block : cached_blocks) {
+        VLOG_DEBUG << fmt::format("Decrease block size {}, {}", block.first->allocated_bytes(),
+                                  block.second);
+        DorisMetrics::instance()->scanner_context_cached_block_size->increment(
+                -block.first->allocated_bytes());
+    }
+    cached_blocks.clear();
+    DorisMetrics::instance()->scanner_task_cnt->increment(-1);
+}
 
 ScannerContext::ScannerContext(
         RuntimeState* state, pipeline::ScanLocalStateBase* local_state,
@@ -288,6 +301,8 @@ void ScannerContext::push_back_scan_task(std::shared_ptr<ScanTask> scan_task) {
 
 Status ScannerContext::get_block_from_queue(RuntimeState* state, vectorized::Block* block,
                                             bool* eos, int id) {
+    MonotonicStopWatch watch;
+    watch.start();
     if (state->is_cancelled()) {
         _set_scanner_done();
         return state->cancel_reason();
@@ -321,6 +336,7 @@ Status ScannerContext::get_block_from_queue(RuntimeState* state, vectorized::Blo
         if (!scan_task->cached_blocks.empty()) {
             auto [current_block, block_size] = std::move(scan_task->cached_blocks.front());
             scan_task->cached_blocks.pop_front();
+            DorisMetrics::instance()->scanner_context_cached_block_size->increment(-block_size);
             DorisMetrics::instance()->scanner_context_cached_block_cnt->increment(-1);
             _block_memory_usage -= block_size;
             // consume current block
@@ -363,6 +379,7 @@ Status ScannerContext::get_block_from_queue(RuntimeState* state, vectorized::Blo
     if (_tasks_queue.empty()) {
         _dependency->block();
     }
+    DorisMetrics::instance()->scan_operator_get_block_from_queue_stats->add(watch.elapsed_time());
 
     return Status::OK();
 }
@@ -405,7 +422,8 @@ void ScannerContext::stop_scanners(RuntimeState* state) {
             sc->_scanner->try_stop();
         }
     }
-    DorisMetrics::instance()->scanner_context_cached_task_queue_size->increment(-_tasks_queue.size());
+    DorisMetrics::instance()->scanner_context_cached_task_queue_size->increment(
+            -_tasks_queue.size());
     _tasks_queue.clear();
     // TODO yiguolei, call mark close to scanners
     if (state->enable_profile()) {

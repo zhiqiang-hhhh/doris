@@ -19,11 +19,14 @@
 
 #include <jni.h>
 
+#include <cstdint>
 #include <memory>
 #include <set>
 #include <string>
 #include <vector>
 
+#include "util/histogram.h"
+#include "util/interval_histogram.h"
 #include "util/jvm_metrics.h"
 #include "util/metrics.h"
 #include "util/system_metrics.h"
@@ -225,12 +228,27 @@ public:
     IntCounter* scanner_ctx_cnt = nullptr;
     IntCounter* scanner_cnt = nullptr;
     IntCounter* scanner_task_cnt = nullptr;
-    IntCounter* scanner_context_cached_block_cnt = nullptr;
-    IntCounter* scanner_context_cached_task_queue_size = nullptr;
+    IntGauge* scanner_context_cached_block_cnt = nullptr;
+    IntGauge* scanner_context_cached_block_size = nullptr;
+    IntGauge* scanner_context_cached_task_queue_size = nullptr;
     IntCounter* scanner_get_null_free_block_cnt = nullptr;
 
-    DoubleGauge* scan_operator_get_block_from_queue_time = nullptr;
+    DoubleGauge* scan_operator_get_block_from_queue_costs = nullptr;
     DoubleGauge* scanner_get_block_costs = nullptr;
+    DoubleGauge* scanner_do_real_task_costs = nullptr;
+    DoubleGauge* scanner_merge_block_costs = nullptr;
+    DoubleGauge* scanner_do_real_task_costs_3 = nullptr;
+
+    std::unique_ptr<IntervalHistogramStat<int64_t>> scan_operator_get_block_from_queue_stats =
+            std::make_unique<IntervalHistogramStat<int64_t>>(100);
+    std::unique_ptr<IntervalHistogramStat<int64_t>> scanner_get_block_stats =
+            std::make_unique<IntervalHistogramStat<int64_t>>(100);
+    std::unique_ptr<IntervalHistogramStat<int64_t>> scanner_do_real_task_stats =
+            std::make_unique<IntervalHistogramStat<int64_t>>(100);
+    std::unique_ptr<IntervalHistogramStat<int64_t>> scanner_merge_block_costs_stat =
+            std::make_unique<IntervalHistogramStat<int64_t>>(100);
+    std::unique_ptr<IntervalHistogramStat<int64_t>> scanner_do_real_task_stats_3 =
+            std::make_unique<IntervalHistogramStat<int64_t>>(100);
 
     static DorisMetrics* instance() {
         static DorisMetrics instance;
@@ -257,7 +275,6 @@ private:
     void _update_process_thread_num();
     void _update_process_fd_num();
 
-private:
     static const std::string _s_registry_name;
     static const std::string _s_hook_name;
 
