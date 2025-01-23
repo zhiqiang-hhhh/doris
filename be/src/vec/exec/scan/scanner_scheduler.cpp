@@ -319,8 +319,7 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
 
                 DorisMetrics::instance()->scanner_get_block_stats->add(watch.elapsed_time());
             } // end for while
-            VLOG_DEBUG
-            << fmt::format("Get block for loop costs {}", watch0.elapsed_time() / 1000000);
+            DorisMetrics::instance()->scanner_get_block_for_loop_stats->add(watch0.elapsed_time());
             if (UNLIKELY(!status.ok())) {
                 scan_task->set_status(status);
                 eos = true;

@@ -276,6 +276,8 @@ Status ScannerContext::submit_scan_task(std::shared_ptr<ScanTask> scan_task,
 }
 
 void ScannerContext::push_back_scan_task(std::shared_ptr<ScanTask> scan_task) {
+    MonotonicStopWatch watch;
+    watch.start();
     if (scan_task->status_ok()) {
         for (const auto& [block, _] : scan_task->cached_blocks) {
             if (block->rows() > 0) {
@@ -293,9 +295,9 @@ void ScannerContext::push_back_scan_task(std::shared_ptr<ScanTask> scan_task) {
         _process_status = scan_task->get_status();
     }
     _tasks_queue.push_back(scan_task);
-    DorisMetrics::instance()->scanner_context_cached_task_queue_size->increment(1);
     _num_scheduled_scanners--;
-
+    DorisMetrics::instance()->scanner_context_cached_task_queue_size->increment(1);
+    DorisMetrics::instance()->scanner_push_back_scan_task_stats->add(watch.elapsed_time());
     _dependency->set_ready();
 }
 
