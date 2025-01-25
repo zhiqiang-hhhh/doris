@@ -201,6 +201,8 @@ DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_get_block_costs, MetricUnit::NANOSECO
 DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_do_real_task_costs, MetricUnit::NANOSECONDS);
 DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_merge_block_costs, MetricUnit::NANOSECONDS);
 DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_push_back_scan_task_costs, MetricUnit::NANOSECONDS);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_push_back_scan_task_costs_0, MetricUnit::NANOSECONDS);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_push_back_scan_task_costs_1, MetricUnit::NANOSECONDS);
 DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_get_block_for_loop_costs, MetricUnit::NANOSECONDS);
 
 const std::string DorisMetrics::_s_registry_name = "doris_be";
@@ -336,6 +338,8 @@ DorisMetrics::DorisMetrics() : _metric_registry(_s_registry_name) {
     DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_do_real_task_costs);
     DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_merge_block_costs);
     DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_push_back_scan_task_costs);
+    DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_push_back_scan_task_costs_0);
+    DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_push_back_scan_task_costs_1);
     DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_get_block_for_loop_costs);
 }
 
@@ -350,8 +354,10 @@ void DorisMetrics::initialize(bool init_system_metrics, const std::set<std::stri
         scan_operator_get_block_from_queue_costs->set_value(
                 scan_operator_get_block_from_queue_stats->mean());
         scanner_do_real_task_costs->set_value(scanner_do_real_task_stats->mean());
-        scanner_merge_block_costs->set_value(scanner_merge_block_costs_stat->mean());
-        scanner_push_back_scan_task_costs->set_value(scanner_push_back_scan_task_stats->mean());
+        scanner_merge_block_costs->set_value(scanner_merge_block_costs_stat->mean());\
+        scanner_push_back_scan_task_costs->set_value(scanner_push_back_scan_task_stats_0->mean() + scanner_push_back_scan_task_stats_1->mean());
+        scanner_push_back_scan_task_costs_0->set_value(scanner_push_back_scan_task_stats_0->mean());
+        scanner_push_back_scan_task_costs_1->set_value(scanner_push_back_scan_task_stats_1->mean());
         scanner_get_block_for_loop_costs->set_value(scanner_get_block_for_loop_stats->mean());
     });
 }

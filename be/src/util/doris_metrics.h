@@ -238,6 +238,8 @@ public:
     DoubleGauge* scanner_do_real_task_costs = nullptr;
     DoubleGauge* scanner_merge_block_costs = nullptr;
     DoubleGauge* scanner_push_back_scan_task_costs = nullptr;
+    DoubleGauge* scanner_push_back_scan_task_costs_0 = nullptr;
+    DoubleGauge* scanner_push_back_scan_task_costs_1 = nullptr;
     DoubleGauge* scanner_get_block_for_loop_costs = nullptr;
 
     std::unique_ptr<IntervalHistogramStat<int64_t>> scan_operator_get_block_from_queue_stats =
@@ -248,7 +250,9 @@ public:
             std::make_unique<IntervalHistogramStat<int64_t>>(100);
     std::unique_ptr<IntervalHistogramStat<int64_t>> scanner_merge_block_costs_stat =
             std::make_unique<IntervalHistogramStat<int64_t>>(100);
-    std::unique_ptr<IntervalHistogramStat<int64_t>> scanner_push_back_scan_task_stats =
+    std::unique_ptr<IntervalHistogramStat<int64_t>> scanner_push_back_scan_task_stats_0 =
+            std::make_unique<IntervalHistogramStat<int64_t>>(100);
+    std::unique_ptr<IntervalHistogramStat<int64_t>> scanner_push_back_scan_task_stats_1 =
             std::make_unique<IntervalHistogramStat<int64_t>>(100);
     std::unique_ptr<IntervalHistogramStat<int64_t>> scanner_get_block_for_loop_stats =
             std::make_unique<IntervalHistogramStat<int64_t>>(100);
