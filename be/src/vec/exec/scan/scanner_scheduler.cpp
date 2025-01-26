@@ -271,8 +271,6 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
                 }
                 // Projection will truncate useless columns, makes block size change.
                 auto free_block_bytes = free_block->allocated_bytes();
-                DorisMetrics::instance()->scanner_context_cached_block_size->increment(
-                        free_block_bytes);
                 raw_bytes_read += free_block_bytes;
 
                 if (!scan_task->cached_blocks.empty() &&
@@ -295,13 +293,18 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
                     // Return block succeed or not, this free_block is not used by this scan task any more.
                     // If block can be reused, its memory usage will be added back.
                     ctx->return_free_block(std::move(free_block));
-                    ctx->inc_block_usage(scan_task->cached_blocks.back().first->allocated_bytes() -
-                                         block_size);
+                    size_t block_usage_delta =
+                            scan_task->cached_blocks.back().first->allocated_bytes() - block_size;
+                    ctx->inc_block_usage(block_usage_delta);
+                    DorisMetrics::instance()->scanner_context_cached_block_size->increment(
+                        block_usage_delta);
                     DorisMetrics::instance()->scanner_merge_block_costs_stat->add(
                             watch2.elapsed_time());
                 } else {
                     ctx->inc_block_usage(free_block_bytes);
                     scan_task->cached_blocks.emplace_back(std::move(free_block), free_block_bytes);
+                    DorisMetrics::instance()->scanner_context_cached_block_size->increment(
+                        free_block_bytes);
                     DorisMetrics::instance()->scanner_context_cached_block_cnt->increment(1);
                 }
 

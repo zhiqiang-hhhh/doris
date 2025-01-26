@@ -359,6 +359,14 @@ void DorisMetrics::initialize(bool init_system_metrics, const std::set<std::stri
         scanner_push_back_scan_task_costs_0->set_value(scanner_push_back_scan_task_stats_0->mean());
         scanner_push_back_scan_task_costs_1->set_value(scanner_push_back_scan_task_stats_1->mean());
         scanner_get_block_for_loop_costs->set_value(scanner_get_block_for_loop_stats->mean());
+
+        scanner_get_block_stats->reduce_size(1);
+        scan_operator_get_block_from_queue_stats->reduce_size(1);
+        scanner_do_real_task_stats->reduce_size(1);
+        scanner_merge_block_costs_stat->reduce_size(1);
+        scanner_push_back_scan_task_stats_0->reduce_size(1);
+        scanner_push_back_scan_task_stats_1->reduce_size(1);
+        scanner_get_block_for_loop_stats->reduce_size(1);
     });
 }
 

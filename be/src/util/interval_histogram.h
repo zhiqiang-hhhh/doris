@@ -37,6 +37,8 @@ public:
     T median();
     T max();
     T min();
+    
+    void reduce_size(size_t n); // New method to reduce the size of the window
 
 private:
     boost::circular_buffer<T> window;

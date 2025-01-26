@@ -54,6 +54,7 @@ using namespace std::chrono_literals;
 
 ScanTask::~ScanTask() {
     SCOPED_SWITCH_THREAD_MEM_TRACKER_LIMITER(_query_thread_context.query_mem_tracker);
+    VLOG_DEBUG << fmt::format("Destroy scan task, cacheblock cnt {}", cached_blocks.size());
     DorisMetrics::instance()->scanner_context_cached_block_cnt->increment(-cached_blocks.size());
     for (auto& block : cached_blocks) {
         VLOG_DEBUG << fmt::format("Decrease block size {}, {}", block.first->allocated_bytes(),
@@ -276,7 +277,6 @@ Status ScannerContext::submit_scan_task(std::shared_ptr<ScanTask> scan_task,
 }
 
 void ScannerContext::push_back_scan_task(std::shared_ptr<ScanTask> scan_task) {
-    
     MonotonicStopWatch watch0;
     watch0.start();
     if (scan_task->status_ok()) {
@@ -342,6 +342,9 @@ Status ScannerContext::get_block_from_queue(RuntimeState* state, vectorized::Blo
         if (!scan_task->cached_blocks.empty()) {
             auto [current_block, block_size] = std::move(scan_task->cached_blocks.front());
             scan_task->cached_blocks.pop_front();
+            VLOG_DEBUG << fmt::format(
+                    "ScannerContext pop front cached block, size {}, {}",
+                    current_block->allocated_bytes(), block_size);
             DorisMetrics::instance()->scanner_context_cached_block_size->increment(-block_size);
             DorisMetrics::instance()->scanner_context_cached_block_cnt->increment(-1);
             _block_memory_usage -= block_size;
