@@ -195,15 +195,15 @@ DEFINE_COUNTER_METRIC_PROTOTYPE_2ARG(scanner_context_cached_block_cnt, MetricUni
 DEFINE_COUNTER_METRIC_PROTOTYPE_2ARG(scanner_context_cached_block_size, MetricUnit::BYTES);
 DEFINE_COUNTER_METRIC_PROTOTYPE_2ARG(scanner_context_cached_task_queue_size, MetricUnit::NOUNIT);
 DEFINE_COUNTER_METRIC_PROTOTYPE_2ARG(scanner_get_null_free_block_cnt, MetricUnit::NOUNIT);
-DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scan_operator_get_block_from_queue_costs,
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scan_operator_get_block_from_queue_costs_ns_total,
                                    MetricUnit::NANOSECONDS);
-DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_get_block_costs, MetricUnit::NANOSECONDS);
-DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_do_real_task_costs, MetricUnit::NANOSECONDS);
-DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_merge_block_costs, MetricUnit::NANOSECONDS);
-DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_push_back_scan_task_costs, MetricUnit::NANOSECONDS);
-DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_push_back_scan_task_costs_0, MetricUnit::NANOSECONDS);
-DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_push_back_scan_task_costs_1, MetricUnit::NANOSECONDS);
-DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_get_block_for_loop_costs, MetricUnit::NANOSECONDS);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_get_block_costs_ns_total, MetricUnit::NANOSECONDS);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_do_real_task_costs_ns_total, MetricUnit::NANOSECONDS);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_merge_block_costs_ns_total, MetricUnit::NANOSECONDS);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_push_back_scan_task_costs_ns_total, MetricUnit::NANOSECONDS);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_push_back_scan_task_costs_0_ns_total, MetricUnit::NANOSECONDS);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_push_back_scan_task_costs_1_ns_total, MetricUnit::NANOSECONDS);
+DEFINE_GAUGE_METRIC_PROTOTYPE_2ARG(scanner_get_block_for_loop_costs_ns_total, MetricUnit::NANOSECONDS);
 
 const std::string DorisMetrics::_s_registry_name = "doris_be";
 const std::string DorisMetrics::_s_hook_name = "doris_metrics";
@@ -333,14 +333,14 @@ DorisMetrics::DorisMetrics() : _metric_registry(_s_registry_name) {
     INT_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_context_cached_block_size);
     INT_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_context_cached_task_queue_size);
     INT_COUNTER_METRIC_REGISTER(_server_metric_entity, scanner_get_null_free_block_cnt);
-    DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_get_block_costs);
-    DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scan_operator_get_block_from_queue_costs);
-    DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_do_real_task_costs);
-    DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_merge_block_costs);
-    DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_push_back_scan_task_costs);
-    DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_push_back_scan_task_costs_0);
-    DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_push_back_scan_task_costs_1);
-    DOUBLE_GAUGE_METRIC_REGISTER(_server_metric_entity, scanner_get_block_for_loop_costs);
+    INT_COUNTER_METRIC_REGISTER(_server_metric_entity, scanner_get_block_costs_ns_total);
+    INT_COUNTER_METRIC_REGISTER(_server_metric_entity, scan_operator_get_block_from_queue_costs_ns_total);
+    INT_COUNTER_METRIC_REGISTER(_server_metric_entity, scanner_do_real_task_costs_ns_total);
+    INT_COUNTER_METRIC_REGISTER(_server_metric_entity, scanner_merge_block_costs_ns_total);
+    INT_COUNTER_METRIC_REGISTER(_server_metric_entity, scanner_push_back_scan_task_costs_ns_total);
+    INT_COUNTER_METRIC_REGISTER(_server_metric_entity, scanner_push_back_scan_task_costs_0_ns_total);
+    INT_COUNTER_METRIC_REGISTER(_server_metric_entity, scanner_push_back_scan_task_costs_1_ns_total);
+    INT_COUNTER_METRIC_REGISTER(_server_metric_entity, scanner_get_block_for_loop_costs_ns_total);
 }
 
 void DorisMetrics::initialize(bool init_system_metrics, const std::set<std::string>& disk_devices,
@@ -349,25 +349,6 @@ void DorisMetrics::initialize(bool init_system_metrics, const std::set<std::stri
         _system_metrics.reset(
                 new SystemMetrics(&_metric_registry, disk_devices, network_interfaces));
     }
-    _server_metric_entity->register_hook("update scanner related", [this]() {
-        scanner_get_block_costs->set_value(scanner_get_block_stats->mean());
-        scan_operator_get_block_from_queue_costs->set_value(
-                scan_operator_get_block_from_queue_stats->mean());
-        scanner_do_real_task_costs->set_value(scanner_do_real_task_stats->mean());
-        scanner_merge_block_costs->set_value(scanner_merge_block_costs_stat->mean());\
-        scanner_push_back_scan_task_costs->set_value(scanner_push_back_scan_task_stats_0->mean() + scanner_push_back_scan_task_stats_1->mean());
-        scanner_push_back_scan_task_costs_0->set_value(scanner_push_back_scan_task_stats_0->mean());
-        scanner_push_back_scan_task_costs_1->set_value(scanner_push_back_scan_task_stats_1->mean());
-        scanner_get_block_for_loop_costs->set_value(scanner_get_block_for_loop_stats->mean());
-
-        scanner_get_block_stats->reduce_size(1);
-        scan_operator_get_block_from_queue_stats->reduce_size(1);
-        scanner_do_real_task_stats->reduce_size(1);
-        scanner_merge_block_costs_stat->reduce_size(1);
-        scanner_push_back_scan_task_stats_0->reduce_size(1);
-        scanner_push_back_scan_task_stats_1->reduce_size(1);
-        scanner_get_block_for_loop_stats->reduce_size(1);
-    });
 }
 
 void DorisMetrics::init_jvm_metrics(JNIEnv* env) {

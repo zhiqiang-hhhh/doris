@@ -261,7 +261,7 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
                     status = scanner->get_block_after_projects(state, free_block.get(), &eos);
                     VLOG_DEBUG << fmt::format("Scanner get block costs: {}",
                                               watch1.elapsed_time() / 1000000);
-                    DorisMetrics::instance()->scanner_do_real_task_stats->add(
+                    DorisMetrics::instance()->scanner_do_real_task_costs_ns_total->increment(
                             watch1.elapsed_time());
                 }
                 first_read = false;
@@ -298,7 +298,7 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
                     ctx->inc_block_usage(block_usage_delta);
                     DorisMetrics::instance()->scanner_context_cached_block_size->increment(
                         block_usage_delta);
-                    DorisMetrics::instance()->scanner_merge_block_costs_stat->add(
+                    DorisMetrics::instance()->scanner_merge_block_costs_ns_total->increment(
                             watch2.elapsed_time());
                 } else {
                     ctx->inc_block_usage(free_block_bytes);
@@ -320,9 +320,9 @@ void ScannerScheduler::_scanner_scan(std::shared_ptr<ScannerContext> ctx,
                     break;
                 }
 
-                DorisMetrics::instance()->scanner_get_block_stats->add(watch.elapsed_time());
+                DorisMetrics::instance()->scanner_get_block_costs_ns_total->increment(watch.elapsed_time());
             } // end for while
-            DorisMetrics::instance()->scanner_get_block_for_loop_stats->add(watch0.elapsed_time());
+            DorisMetrics::instance()->scanner_get_block_for_loop_costs_ns_total->increment(watch0.elapsed_time());
             if (UNLIKELY(!status.ok())) {
                 scan_task->set_status(status);
                 eos = true;

@@ -297,12 +297,12 @@ void ScannerContext::push_back_scan_task(std::shared_ptr<ScanTask> scan_task) {
     }
     _tasks_queue.push_back(scan_task);
     _num_scheduled_scanners--;
-    DorisMetrics::instance()->scanner_push_back_scan_task_stats_0->add(watch0.elapsed_time());
+    DorisMetrics::instance()->scanner_push_back_scan_task_costs_0_ns_total->increment(watch0.elapsed_time());
     MonotonicStopWatch watch1;
     watch1.start();
     _dependency->set_ready();
     DorisMetrics::instance()->scanner_context_cached_task_queue_size->increment(1);
-    DorisMetrics::instance()->scanner_push_back_scan_task_stats_1->add(watch1.elapsed_time());
+    DorisMetrics::instance()->scanner_push_back_scan_task_costs_1_ns_total->increment(watch1.elapsed_time());
 }
 
 Status ScannerContext::get_block_from_queue(RuntimeState* state, vectorized::Block* block,
@@ -388,7 +388,7 @@ Status ScannerContext::get_block_from_queue(RuntimeState* state, vectorized::Blo
     if (_tasks_queue.empty()) {
         _dependency->block();
     }
-    DorisMetrics::instance()->scan_operator_get_block_from_queue_stats->add(watch.elapsed_time());
+    DorisMetrics::instance()->scan_operator_get_block_from_queue_costs_ns_total->increment(watch.elapsed_time());
 
     return Status::OK();
 }
