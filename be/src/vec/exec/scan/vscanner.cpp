@@ -79,7 +79,9 @@ Status VScanner::get_block_after_projects(RuntimeState* state, vectorized::Block
     if (_output_row_descriptor) {
         _origin_block.clear_column_data(row_descriptor.num_materialized_slots());
         auto status = get_block(state, &_origin_block, eos);
-        if (UNLIKELY(!status.ok())) return status;
+        if (UNLIKELY(!status.ok())) {
+            return status;
+        }
         return _do_projections(&_origin_block, block);
     }
     return get_block(state, block, eos);

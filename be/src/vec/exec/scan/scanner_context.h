@@ -32,6 +32,7 @@
 
 #include "common/config.h"
 #include "common/factory_creator.h"
+#include "common/logging.h"
 #include "common/status.h"
 #include "concurrentqueue.h"
 #include "util/doris_metrics.h"
@@ -65,11 +66,7 @@ public:
         DorisMetrics::instance()->scanner_task_cnt->increment(1);
     }
 
-    ~ScanTask() {
-        SCOPED_SWITCH_THREAD_MEM_TRACKER_LIMITER(_resource_ctx->memory_context()->mem_tracker());
-        cached_blocks.clear();
-        DorisMetrics::instance()->scanner_task_cnt->increment(-1);
-    }
+    ~ScanTask();
 
 private:
     // whether current scanner is finished
