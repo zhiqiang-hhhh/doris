@@ -464,13 +464,6 @@ PipelineXLocalStateBase::PipelineXLocalStateBase(RuntimeState* state, OperatorXB
 
 template <typename SharedStateArg>
 Status PipelineXLocalState<SharedStateArg>::init(RuntimeState* state, LocalStateInfo& info) {
-    /*
-    XXXX_OPERATOR(id=xx):
-        CommonCounters:
-            - CounterA : Value
-        CustomCounters:
-            - CounterB : Value
-    */
     _runtime_profile.reset(new RuntimeProfile(_parent->get_name() + name_suffix()));
     _runtime_profile->set_metadata(_parent->node_id());
     _runtime_profile->set_is_sink(false);
