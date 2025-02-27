@@ -475,8 +475,9 @@ public class RuntimeProfile {
     boolean shouldBeIncluded() {
         if (Objects.equals(this.name, "CommonCounters") || Objects.equals(this.name, "CustomCounters")) {
             return true;
-        } else
+        } else {
             return this.name.matches(".*Pipeline.*") || this.name.matches(".*_OPERATOR.*");
+        }
     }
 
     public static void mergeProfiles(List<RuntimeProfile> profiles,
