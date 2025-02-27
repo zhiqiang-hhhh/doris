@@ -94,7 +94,7 @@ public:
     Status open(RuntimeState* state) override {
         RETURN_IF_ERROR(Base::open(state));
         // init profile for runtime filter
-        // RuntimeFilterConsumer::_init_profile(local_state._shared_state->_multi_cast_data_streamer->profile());
+        // RuntimeFilterConsumer::_init_profile(local_state._shared_state->_multi_cast_data_streamer->custom_profile());
         if (_t_data_stream_sink.__isset.output_exprs) {
             RETURN_IF_ERROR(vectorized::VExpr::create_expr_trees(_t_data_stream_sink.output_exprs,
                                                                  _output_expr_contexts));

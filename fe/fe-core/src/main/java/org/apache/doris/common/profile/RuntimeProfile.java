@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -471,12 +472,23 @@ public class RuntimeProfile {
         return builder.toString();
     }
 
+    boolean shouldBeIncluded() {
+        if (Objects.equals(this.name, "CommonCounters") || Objects.equals(this.name, "CustomCounters")) {
+            return true;
+        }
+        if (this.name.matches(".*Pipeline.*") || this.name.matches(".*_OPERATOR.*")) {
+            return false;
+        }
+        return false;
+    }
+
     public static void mergeProfiles(List<RuntimeProfile> profiles,
-            RuntimeProfile simpleProfile, Map<Integer, String> planNodeMap) {
-        mergeCounters(ROOT_COUNTER, profiles, simpleProfile);
+            RuntimeProfile resultProfile, Map<Integer, String> planNodeMap) {
+        mergeCounters(ROOT_COUNTER, profiles, resultProfile);
         if (profiles.isEmpty()) {
             return;
         }
+
         RuntimeProfile templateProfile = profiles.get(0);
         for (int i = 0; i < templateProfile.childList.size(); i++) {
             RuntimeProfile templateChildProfile = templateProfile.childList.get(i).first;
@@ -485,11 +497,10 @@ public class RuntimeProfile {
             RuntimeProfile newCreatedMergedChildProfile = new RuntimeProfile(templateChildProfile.name,
                     templateChildProfile.nodeId());
             mergeProfiles(allChilds, newCreatedMergedChildProfile, planNodeMap);
-            // RuntimeProfile has at least one counter named TotalTime, should exclude it.
-            if (newCreatedMergedChildProfile.counterMap.size() > 1) {
-                simpleProfile.addChildWithCheck(newCreatedMergedChildProfile, planNodeMap,
+            if (newCreatedMergedChildProfile.shouldBeIncluded()) {
+                resultProfile.addChildWithCheck(newCreatedMergedChildProfile, planNodeMap,
                                             templateProfile.childList.get(i).second);
-                simpleProfile.rowsProducedMap.putAll(newCreatedMergedChildProfile.rowsProducedMap);
+                resultProfile.rowsProducedMap.putAll(newCreatedMergedChildProfile.rowsProducedMap);
             }
         }
     }

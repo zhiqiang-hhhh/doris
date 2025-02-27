@@ -80,14 +80,14 @@ Status LocalExchangeSinkLocalState::init(RuntimeState* state, LocalSinkStateInfo
     RETURN_IF_ERROR(Base::init(state, info));
     SCOPED_TIMER(exec_time_counter());
     SCOPED_TIMER(_init_timer);
-    _compute_hash_value_timer = ADD_TIMER(profile(), "ComputeHashValueTime");
-    _distribute_timer = ADD_TIMER(profile(), "DistributeDataTime");
+    _compute_hash_value_timer = ADD_TIMER(custom_profile(), "ComputeHashValueTime");
+    _distribute_timer = ADD_TIMER(custom_profile(), "DistributeDataTime");
     if (_parent->cast<LocalExchangeSinkOperatorX>()._type == ExchangeType::HASH_SHUFFLE) {
-        _profile->add_info_string(
+        custom_profile()->add_info_string(
                 "UseGlobalShuffle",
                 std::to_string(_parent->cast<LocalExchangeSinkOperatorX>()._use_global_shuffle));
     }
-    _profile->add_info_string(
+    custom_profile()->add_info_string(
             "PartitionExprsSize",
             std::to_string(_parent->cast<LocalExchangeSinkOperatorX>()._partitioned_exprs_num));
     _channel_id = info.task_idx;

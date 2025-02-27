@@ -48,8 +48,8 @@ std::vector<Dependency*> MultiCastDataStreamSinkLocalState::dependencies() const
 
 Status MultiCastDataStreamSinkLocalState::open(RuntimeState* state) {
     RETURN_IF_ERROR(Base::open(state));
-    _shared_state->multi_cast_data_streamer->set_sink_profile(profile());
-    _shared_state->setup_shared_profile(profile());
+    _shared_state->multi_cast_data_streamer->set_sink_profile(operator_profile());
+    _shared_state->setup_shared_profile(custom_profile());
     _shared_state->multi_cast_data_streamer->set_write_dependency(_dependency);
     return Status::OK();
 }
