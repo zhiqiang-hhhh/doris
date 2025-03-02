@@ -69,7 +69,7 @@ Status ScanLocalState<Derived>::init(RuntimeState* state, LocalStateInfo& info) 
     _scan_dependency = Dependency::create_shared(_parent->operator_id(), _parent->node_id(),
                                                  _parent->get_name() + "_DEPENDENCY");
     _wait_for_dependency_timer = ADD_TIMER_WITH_LEVEL(
-            custom_profile(), "WaitForDependency[" + _scan_dependency->name() + "]Time", 1);
+            common_profile(), "WaitForDependency[" + _scan_dependency->name() + "]Time", 1);
     SCOPED_TIMER(exec_time_counter());
     SCOPED_TIMER(_init_timer);
     auto& p = _parent->cast<typename Derived::Parent>();
@@ -89,7 +89,7 @@ Status ScanLocalState<Derived>::init(RuntimeState* state, LocalStateInfo& info) 
     // could add here, not in the _init_profile() function
     _prepare_rf_timer(custom_profile());
 
-    _wait_for_rf_timer = ADD_TIMER(custom_profile(), "WaitForRuntimeFilter");
+    _wait_for_rf_timer = ADD_TIMER(common_profile(), "WaitForRuntimeFilter");
     return Status::OK();
 }
 
