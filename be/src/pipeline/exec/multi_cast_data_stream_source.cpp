@@ -42,7 +42,7 @@ Status MultiCastDataStreamSourceLocalState::init(RuntimeState* state, LocalState
     // so that it could get common_profile and custom_profile as same time.
     _shared_state->multi_cast_data_streamer->set_source_profile(p._consumer_id, operator_profile());
     _shared_state->multi_cast_data_streamer->set_dep_by_sender_idx(p._consumer_id, _dependency);
-    _wait_for_rf_timer = ADD_TIMER(custom_profile(), "WaitForRuntimeFilter");
+    _wait_for_rf_timer = ADD_TIMER(common_profile(), "WaitForRuntimeFilter");
     _filter_timer = ADD_TIMER(custom_profile(), "FilterTime");
     _get_data_timer = ADD_TIMER(custom_profile(), "GetDataTime");
     _materialize_data_timer = ADD_TIMER(custom_profile(), "MaterializeDataTime");
