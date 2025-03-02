@@ -497,10 +497,10 @@ Status PipelineXLocalState<SharedStateArg>::init(RuntimeState* state, LocalState
             ADD_COUNTER_WITH_LEVEL(_common_profile, "RowsProduced", TUnit::UNIT, 1);
     _blocks_returned_counter =
             ADD_COUNTER_WITH_LEVEL(_common_profile, "BlocksProduced", TUnit::UNIT, 1);
-    _projection_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "ProjectionTime", 1);
-    _init_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "InitTime", 1);
-    _open_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "OpenTime", 1);
-    _close_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "CloseTime", 1);
+    _projection_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "ProjectionTime", 2);
+    _init_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "InitTime", 2);
+    _open_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "OpenTime", 2);
+    _close_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "CloseTime", 2);
     _exec_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "ExecTime", 1);
     _memory_used_counter =
             _common_profile->AddHighWaterMarkCounter("MemoryUsage", TUnit::BYTES, "", 1);
@@ -573,9 +573,9 @@ Status PipelineXSinkLocalState<SharedState>::init(RuntimeState* state, LocalSink
     }
 
     _rows_input_counter = ADD_COUNTER_WITH_LEVEL(_common_profile, "InputRows", TUnit::UNIT, 1);
-    _init_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "InitTime", 1);
-    _open_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "OpenTime", 1);
-    _close_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "CloseTime", 1);
+    _init_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "InitTime", 2);
+    _open_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "OpenTime", 2);
+    _close_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "CloseTime", 2);
     _exec_timer = ADD_TIMER_WITH_LEVEL(_common_profile, "ExecTime", 1);
     _memory_used_counter =
             _common_profile->AddHighWaterMarkCounter("MemoryUsage", TUnit::BYTES, "", 1);

@@ -398,7 +398,7 @@ public class Profile {
             // For load task, they will have multiple execution_profiles.
             for (ExecutionProfile executionProfile : executionProfiles) {
                 builder.append("\n");
-                executionProfile.getRoot().prettyPrint(builder, "");
+                executionProfile.prettyPrint(builder, "");
             }
         } catch (Throwable aggProfileException) {
             LOG.warn("build profile failed", aggProfileException);

@@ -145,7 +145,8 @@ public class ExecutionProfile {
         }
     }
 
-    void setMultiBeProfile(int fragmentId, TNetworkAddress backendHBAddress, List<RuntimeProfile> taskProfile) {
+    protected void setMultiBeProfile(int fragmentId, TNetworkAddress backendHBAddress,
+                                List<RuntimeProfile> taskProfile) {
         multiBeProfileLock.writeLock().lock();
         try {
             multiBeProfile.get(fragmentId).put(backendHBAddress, taskProfile);
@@ -154,7 +155,7 @@ public class ExecutionProfile {
         }
     }
 
-    private RuntimeProfile getPipelineAggregatedProfile(Map<Integer, String> planNodeMap) {
+    protected RuntimeProfile getPipelineAggregatedProfile(Map<Integer, String> planNodeMap) {
         RuntimeProfile fragmentsProfile = new RuntimeProfile("Fragments");
         for (int i = 0; i < fragmentProfiles.size(); ++i) {
             RuntimeProfile newFragmentProfile = new RuntimeProfile("Fragment " + i);
@@ -320,11 +321,11 @@ public class ExecutionProfile {
 
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("ExecutionProfile: ").append(DebugUtil.printId(queryId)).append("\n");
-        for (Entry<Integer, RuntimeProfile> entry : fragmentProfiles.entrySet()) {
-            sb.append("Fragment ").append(entry.getKey()).append(":\n");
-            entry.getValue().prettyPrint(sb, " ");
-        }
+        root.prettyPrint(sb, "");
         return sb.toString();
+    }
+
+    public void prettyPrint(StringBuilder sb, String prefix) {
+        root.prettyPrint(sb, prefix);
     }
 }
