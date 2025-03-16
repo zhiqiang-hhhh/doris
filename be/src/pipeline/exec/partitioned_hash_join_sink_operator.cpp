@@ -568,6 +568,7 @@ void PartitionedHashJoinSinkLocalState::update_profile_from_inner() {
     if (sink_local_state) {
         auto* inner_sink_state = assert_cast<HashJoinBuildSinkLocalState*>(sink_local_state);
         auto* inner_profile = inner_sink_state->custom_profile();
+        DCHECK(inner_profile != nullptr);
         UPDATE_COUNTER_FROM_INNER("PublishRuntimeFilterTime");
         UPDATE_COUNTER_FROM_INNER("BuildRuntimeFilterTime");
         UPDATE_COUNTER_FROM_INNER("BuildHashTableTime");
