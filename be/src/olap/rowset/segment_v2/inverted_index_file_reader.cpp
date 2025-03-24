@@ -208,7 +208,9 @@ Result<std::unique_ptr<DorisCompoundReader>> InvertedIndexFileReader::_open(
                     "CLuceneError occur when open idx file {}, stream is nullptr",
                     InvertedIndexDescriptor::get_index_file_path_v2(_index_path_prefix)));
         }
-
+        LOG_INFO("Open index {}, _indices_entries size {} from {}", index_id,
+                 _indices_entries.size(),
+                 InvertedIndexDescriptor::get_index_file_path_v2(_index_path_prefix));
         // Check if the specified index exists
         auto index_it = _indices_entries.find(std::make_pair(index_id, index_suffix));
         if (index_it == _indices_entries.end()) {

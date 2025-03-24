@@ -143,6 +143,7 @@ Status ScannerContext::init() {
 
     // Provide more memory for wide tables, increase proportionally by multiples of 300
     _max_bytes_in_queue *= _output_tuple_desc->slots().size() / 300 + 1;
+    LOG_INFO("Scanner _output_tuple_desc slots size {}", _output_tuple_desc->slots().size());
 
     if (_min_scan_concurrency_of_scan_scheduler == 0) {
         // _scanner_scheduler->get_max_threads() is setted by workload group.

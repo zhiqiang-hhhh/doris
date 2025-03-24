@@ -776,6 +776,7 @@ void Block::erase_tmp_columns() noexcept {
     for (auto& name : all_column_names) {
         if (name.rfind(BeConsts::BLOCK_TEMP_COLUMN_PREFIX, 0) == 0) {
             erase(name);
+            LOG_INFO("Erase tmp column: {}", name);
         }
     }
 }

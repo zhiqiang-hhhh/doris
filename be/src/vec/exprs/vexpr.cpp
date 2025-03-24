@@ -623,6 +623,8 @@ Status VExpr::get_result_from_const(vectorized::Block* block, const std::string&
 
 Status VExpr::_evaluate_inverted_index(VExprContext* context, const FunctionBasePtr& function,
                                        uint32_t segment_num_rows) {
+    LOG_INFO("evaluate_inverted_index for expr: {}, segment_rows {}", expr_name(),
+             segment_num_rows);
     // Pre-allocate vectors based on an estimated or known size
     std::vector<segment_v2::InvertedIndexIterator*> iterators;
     std::vector<vectorized::IndexFieldNameAndTypePair> data_type_with_names;
@@ -736,6 +738,7 @@ Status VExpr::_evaluate_inverted_index(VExprContext* context, const FunctionBase
             index_context->set_true_for_inverted_index_status(this, column_id);
         }
     }
+    LOG_INFO("Result bitmap size {}", result_bitmap.get_data_bitmap()->cardinality());
     return Status::OK();
 }
 

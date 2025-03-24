@@ -59,12 +59,14 @@ Status ParallelScannerBuilder::_build_scanners_by_rowid(std::list<ScannerSPtr>& 
         // share the same delete predicates from their corresponding entire read source.
         TabletReader::ReadSource partitial_read_source;
         int64_t rows_collected = 0;
+        LOG_INFO("Total rowsets {}", entire_read_source.rs_splits.size());
         for (auto& rs_split : entire_read_source.rs_splits) {
             auto reader = rs_split.rs_reader;
             auto rowset = reader->rowset();
             const auto rowset_id = rowset->rowset_id();
 
             const auto& segments_rows = _all_segments_rows[rowset_id];
+            LOG_INFO("Total segments {}", segments_rows.size());
 
             if (rowset->num_rows() == 0) {
                 continue;

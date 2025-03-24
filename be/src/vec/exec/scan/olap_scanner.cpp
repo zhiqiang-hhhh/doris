@@ -438,6 +438,7 @@ Status OlapScanner::_init_variant_columns() {
 }
 
 Status OlapScanner::_init_return_columns() {
+    LOG_INFO("Scanner output tuple desc: {}", _output_tuple_desc->debug_string());
     for (auto* slot : _output_tuple_desc->slots()) {
         if (!slot->is_materialized()) {
             continue;
