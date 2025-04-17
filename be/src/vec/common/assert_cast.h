@@ -24,7 +24,6 @@
 #include <typeinfo>
 
 #include "common/exception.h"
-#include "common/logging.h"
 #include "vec/common/demangle.h"
 
 enum class TypeCheckOnRelease : bool { ENABLE = true, DISABLE = false };
@@ -46,33 +45,37 @@ PURE To assert_cast(From&& from) {
                 if (auto ptr = dynamic_cast<To>(from); ptr != nullptr) {
                     return ptr;
                 }
+#ifdef BE_TEST
+                throw doris::Exception(doris::Status::InternalError("Bad cast from type:{}* to {}*",
+                                                                    demangle(typeid(*from).name()),
+                                                                    demangle(typeid(To).name())));
+#else
                 throw doris::Exception(doris::Status::FatalError("Bad cast from type:{}* to {}",
                                                                  demangle(typeid(*from).name()),
                                                                  demangle(typeid(To).name())));
+#endif
             }
         } else {
             if (typeid(from) == typeid(To)) {
                 return static_cast<To>(from);
             }
         }
-        throw doris::Exception(doris::Status::FatalError("Bad cast from type:{} to {}",
-                                                         demangle(typeid(from).name()),
-                                                         demangle(typeid(To).name())));
+#ifdef BE_TEST
+        throw doris::Exception(doris::Status::InternalError(
+                "Bad cast from type:{} to {}", fmt::format("{}", demangle(typeid(from).name())),
+                fmt::format("", demangle(typeid(To).name()))));
+#else
+        throw doris::Exception(doris::Status::FatalError(
+                "Bad cast from type:{} to {}", fmt::format("{}", demangle(typeid(from).name())),
+                fmt::format("", demangle(typeid(To).name()))));
+#endif
     };
 
 #ifndef NDEBUG
-    try {
-        return perform_cast(std::forward<From>(from));
-    } catch (const std::exception& e) {
-        throw doris::Exception(doris::Status::FatalError("assert cast err:{}", e.what()));
-    }
+    return perform_cast(std::forward<From>(from));
 #else
     if constexpr (check == TypeCheckOnRelease::ENABLE) {
-        try {
-            return perform_cast(std::forward<From>(from));
-        } catch (const std::exception& e) {
-            throw doris::Exception(doris::Status::FatalError("assert cast err:{}", e.what()));
-        }
+        return perform_cast(std::forward<From>(from));
     } else {
         return static_cast<To>(from);
     }
