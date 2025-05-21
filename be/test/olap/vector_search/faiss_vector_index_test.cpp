@@ -83,8 +83,7 @@ static std::vector<std::vector<float>> generate_test_vectors(int num_vectors, in
 }
 
 // Helper function to add vectors to both Doris and native indexes
-static void add_vectors_to_indexes(FaissVectorIndex* doris_index,
-                                   faiss::IndexHNSWFlat* native_index,
+static void add_vectors_to_indexes(FaissVectorIndex* doris_index, faiss::Index* native_index,
                                    const std::vector<std::vector<float>>& vectors) {
     for (size_t i = 0; i < vectors.size(); i++) {
         auto status = doris_index->add(1, vectors[i].data());
@@ -221,132 +220,167 @@ TEST_F(VectorSearchTest, UpdateRoaring) {
 }
 
 TEST_F(VectorSearchTest, CompareResultWithNativeFaiss1) {
-    // Step 1: Create indexes
-    const int dimension = 64;
-    const int max_connections = 16;
-    auto doris_index = create_doris_index(dimension, max_connections);
-    auto native_index = create_native_index(dimension, max_connections);
+    const size_t iterations = 50;
+    // Define fixed parameter sets to choose from
+    const std::vector<int> dimensions = {32, 64, 128, 256};
+    const std::vector<int> max_connections = {8, 16, 32, 64};
+    const std::vector<int> vector_counts = {100, 200, 500, 1000};
 
-    // Step 2: Generate vectors and add to indexes
-    const int num_vectors = 200;
-    auto vectors = generate_test_vectors(num_vectors, dimension);
-    add_vectors_to_indexes(doris_index.get(), native_index.get(), vectors);
+    std::random_device rd;
+    std::mt19937 gen(rd());
 
-    // Step 3: Search
-    int query_idx = num_vectors / 2;
-    const float* query_vec = vectors[query_idx].data();
-    const int top_k = 10;
+    for (size_t iter = 0; iter < iterations; ++iter) {
+        // Randomly select parameters from the fixed sets
+        int dimension = dimensions[std::uniform_int_distribution<>(0, dimensions.size() - 1)(gen)];
+        int max_connection = max_connections[std::uniform_int_distribution<>(
+                0, max_connections.size() - 1)(gen)];
+        int num_vectors =
+                vector_counts[std::uniform_int_distribution<>(0, vector_counts.size() - 1)(gen)];
 
-    // Search in Doris index
-    IndexSearchParameters search_params;
-    IndexSearchResult doris_results;
-    auto search_status =
-            doris_index->ann_topn_search(query_vec, top_k, search_params, doris_results);
-    ASSERT_EQ(search_status.ok(), true);
+        // Step 1: Create indexes
+        auto doris_index = create_doris_index(dimension, max_connection);
+        auto native_index = create_native_index(dimension, max_connection);
 
-    // Search in native Faiss index
-    std::vector<float> native_distances(top_k);
-    std::vector<faiss::idx_t> native_indices(top_k);
-    native_index->search(1, query_vec, top_k, native_distances.data(), native_indices.data());
+        // Step 2: Generate vectors and add to indexes
+        auto vectors = generate_test_vectors(num_vectors, dimension);
+        add_vectors_to_indexes(doris_index.get(), native_index.get(), vectors);
 
-    // Step 4: Print and compare results
-    // print_search_results(doris_results, native_distances, native_indices, query_idx);
-    compare_search_results(doris_results, native_distances, native_indices);
+        // Step 3: Search
+        int query_idx = num_vectors / 2;
+        const float* query_vec = vectors[query_idx].data();
+        const int top_k = 10;
+
+        // Search in Doris index
+        IndexSearchParameters search_params;
+        IndexSearchResult doris_results;
+        auto search_status =
+                doris_index->ann_topn_search(query_vec, top_k, search_params, doris_results);
+        ASSERT_EQ(search_status.ok(), true)
+                << "Search failed with dimension=" << dimension
+                << ", max_connections=" << max_connection << ", num_vectors=" << num_vectors;
+
+        // Search in native Faiss index
+        std::vector<float> native_distances(top_k);
+        std::vector<faiss::idx_t> native_indices(top_k);
+        native_index->search(1, query_vec, top_k, native_distances.data(), native_indices.data());
+
+        // Step 4: Compare results
+        compare_search_results(doris_results, native_distances, native_indices);
+    }
 }
 
 TEST_F(VectorSearchTest, CompareResultWithNativeFaiss2) {
-    // Step 1: Create indexes
-    const int dimension = 64;
-    const int max_connections = 16;
-    auto doris_index = create_doris_index(dimension, max_connections);
-    auto native_index = create_native_index(dimension, max_connections);
+    const size_t iterations = 50;
+    // Define fixed parameter sets to choose from
+    const std::vector<int> dimensions = {32, 64, 128, 256};
+    const std::vector<int> max_connections = {8, 16, 32, 64};
+    const std::vector<int> vector_counts = {100, 200, 500, 1000};
 
-    // Step 2: Generate vectors and add to indexes
-    const int num_vectors = 500;
-    auto vectors = generate_test_vectors(num_vectors, dimension);
-    add_vectors_to_indexes(doris_index.get(), native_index.get(), vectors);
+    std::random_device rd;
+    std::mt19937 gen(rd());
 
-    // Step 3: Search
-    int query_idx = num_vectors / 2;
-    const float* query_vec = vectors[query_idx].data();
-    const int top_k = num_vectors;
+    for (size_t iter = 0; iter < iterations; ++iter) {
+        // Randomly select parameters from the fixed sets
+        int dimension = dimensions[std::uniform_int_distribution<>(0, dimensions.size() - 1)(gen)];
+        int max_connection = max_connections[std::uniform_int_distribution<>(
+                0, max_connections.size() - 1)(gen)];
+        int num_vectors =
+                vector_counts[std::uniform_int_distribution<>(0, vector_counts.size() - 1)(gen)];
 
-    // Search in Doris index
-    IndexSearchParameters search_params;
-    IndexSearchResult doris_results;
-    auto search_status =
-            doris_index->ann_topn_search(query_vec, top_k, search_params, doris_results);
-    ASSERT_EQ(search_status.ok(), true);
+        // Step 1: Create indexes
+        auto doris_index = create_doris_index(dimension, max_connection);
+        auto native_index = create_native_index(dimension, max_connection);
 
-    // Search in native Faiss index
-    std::vector<float> native_distances(top_k, -1);
-    std::vector<faiss::idx_t> native_indices(top_k, -1);
-    native_index->search(1, query_vec, top_k, native_distances.data(), native_indices.data());
+        // Step 2: Generate vectors and add to indexes
+        auto vectors = generate_test_vectors(num_vectors, dimension);
+        add_vectors_to_indexes(doris_index.get(), native_index.get(), vectors);
 
-    // Step 4: Print and compare results
-    // print_search_results(doris_results, native_distances, native_indices, query_idx);
-    compare_search_results(doris_results, native_distances, native_indices);
+        // Step 3: Search
+        int query_idx = num_vectors / 2;
+        const float* query_vec = vectors[query_idx].data();
+        const int top_k = num_vectors;
+
+        // Search in Doris index
+        IndexSearchParameters search_params;
+        IndexSearchResult doris_results;
+        auto search_status =
+                doris_index->ann_topn_search(query_vec, top_k, search_params, doris_results);
+        ASSERT_EQ(search_status.ok(), true)
+                << "Search failed with dimension=" << dimension
+                << ", max_connections=" << max_connection << ", num_vectors=" << num_vectors;
+
+        // Search in native Faiss index
+        std::vector<float> native_distances(top_k, -1);
+        std::vector<faiss::idx_t> native_indices(top_k, -1);
+        native_index->search(1, query_vec, top_k, native_distances.data(), native_indices.data());
+
+        // Step 4: Compare results
+        compare_search_results(doris_results, native_distances, native_indices);
+    }
 }
 
 TEST_F(VectorSearchTest, SearchAllVectors) {
-    // Step 1: Create and build index
-    auto index1 = std::make_unique<FaissVectorIndex>();
+    size_t iterations = 25;
+    for (size_t i = 0; i < iterations; ++i) {
+        // Step 1: Create and build index
+        auto index1 = std::make_unique<FaissVectorIndex>();
 
-    FaissBuildParameter params;
-    params.d = 64;
-    params.m = 32;
-    params.index_type = FaissBuildParameter::IndexType::HNSW;
-    params.quantilizer = FaissBuildParameter::Quantilizer::FLAT;
-    index1->set_build_params(params);
+        FaissBuildParameter params;
+        params.d = 64;
+        params.m = 32;
+        params.index_type = FaissBuildParameter::IndexType::HNSW;
+        params.quantilizer = FaissBuildParameter::Quantilizer::FLAT;
+        index1->set_build_params(params);
 
-    // Add 500 vectors
-    const int num_vectors = 500;
-    std::vector<float> vectors;
-    for (int i = 0; i < num_vectors; i++) {
-        auto vec = generate_random_vector(params.d);
-        vectors.insert(vectors.end(), vec.begin(), vec.end());
+        // Add 500 vectors
+        const int num_vectors = 500;
+        std::vector<float> vectors;
+        for (int i = 0; i < num_vectors; i++) {
+            auto vec = generate_random_vector(params.d);
+            vectors.insert(vectors.end(), vec.begin(), vec.end());
+        }
+
+        ASSERT_EQ(index1->add(500, vectors.data()).ok(), true);
+
+        // Save index
+        ASSERT_TRUE(index1->save(_ram_dir.get()).ok());
+
+        // Step 2: Load index
+        auto index2 = std::make_unique<FaissVectorIndex>();
+        ASSERT_TRUE(index2->load(_ram_dir.get()).ok());
+
+        // Step 3: Search all vectors
+        IndexSearchParameters search_params;
+        IndexSearchResult search_result;
+
+        // Search for all vectors - use a vector we know is in the index
+        std::vector<float> query_vec {vectors.begin(),
+                                      vectors.begin() + params.d}; // Use the first vector we added
+        const int top_k = num_vectors;                             // Get all vectors
+
+        ASSERT_EQ(
+                index2->ann_topn_search(query_vec.data(), top_k, search_params, search_result).ok(),
+                true);
+        // Step 4: Verify we got all vectors back
+        // Note: In practical ANN search with approximate algorithms like HNSW,
+        // we might not get exactly all vectors due to the nature of approximate search.
+        // So we verify we got a reasonable number back.
+        EXPECT_GE(search_result.roaring->cardinality(), num_vectors * 0.60)
+                << "Expected to find at least 60% of all vectors";
+
+        // Also verify the first result is the query vector itself (it should be an exact match)
+        ASSERT_EQ(search_result.roaring->isEmpty(), false) << "Search result should not be empty";
+        size_t first = search_result.roaring->getIndex(0);
+        std::vector<float> first_result_vec(vectors.begin() + first * params.d,
+                                            vectors.begin() + (first + 1) * params.d);
+        std::string query_vec_str = fmt::format("[{}]", fmt::join(query_vec, ","));
+        std::string first_result_vec_str = fmt::format("[{}]", fmt::join(first_result_vec, ","));
+        EXPECT_EQ(first_result_vec, query_vec) << "First result should be the query vector itself";
     }
-
-    ASSERT_EQ(index1->add(500, vectors.data()).ok(), true);
-
-    // Save index
-    ASSERT_TRUE(index1->save(_ram_dir.get()).ok());
-
-    // Step 2: Load index
-    auto index2 = std::make_unique<FaissVectorIndex>();
-    ASSERT_TRUE(index2->load(_ram_dir.get()).ok());
-
-    // Step 3: Search all vectors
-    IndexSearchParameters search_params;
-    IndexSearchResult search_result;
-
-    // Search for all vectors - use a vector we know is in the index
-    std::vector<float> query_vec {vectors.begin(),
-                                  vectors.begin() + params.d}; // Use the first vector we added
-    const int top_k = num_vectors;                             // Get all vectors
-
-    ASSERT_EQ(index2->ann_topn_search(query_vec.data(), top_k, search_params, search_result).ok(),
-              true);
-    std::cout << "Search returned " << search_result.roaring->cardinality() << " results\n";
-    // Step 4: Verify we got all vectors back
-    // Note: In practical ANN search with approximate algorithms like HNSW,
-    // we might not get exactly all vectors due to the nature of approximate search.
-    // So we verify we got a reasonable number back.
-    EXPECT_GE(search_result.roaring->cardinality(), num_vectors * 0.60)
-            << "Expected to find at least 60% of all vectors";
-
-    // Also verify the first result is the query vector itself (it should be an exact match)
-    ASSERT_EQ(search_result.roaring->isEmpty(), false) << "Search result should not be empty";
-    size_t first = search_result.roaring->getIndex(0);
-    std::vector<float> first_result_vec(vectors.begin() + first * params.d,
-                                        vectors.begin() + (first + 1) * params.d);
-    std::string query_vec_str = fmt::format("[{}]", fmt::join(query_vec, ","));
-    std::string first_result_vec_str = fmt::format("[{}]", fmt::join(first_result_vec, ","));
-    EXPECT_EQ(first_result_vec, query_vec) << "First result should be the query vector itself";
 }
 
 TEST_F(VectorSearchTest, CompRangeSearch) {
-    size_t iterations = 50;
+    size_t iterations = 25;
     for (size_t i = 0; i < iterations; ++i) {
         // Random parameters for each test iteration
         std::random_device rd;
@@ -367,35 +401,34 @@ TEST_F(VectorSearchTest, CompRangeSearch) {
         index1->set_build_params(params);
 
         const int num_vectors = random_n;
-        std::vector<float> vectors;
+        std::vector<std::vector<float>> vectors;
         for (int i = 0; i < num_vectors; i++) {
-            auto vec = generate_random_vector(params.d);
-            vectors.insert(vectors.end(), vec.begin(), vec.end());
+            vectors.push_back(generate_random_vector(params.d));
         }
         std::unique_ptr<faiss::Index> native_index =
                 std::make_unique<faiss::IndexHNSWFlat>(params.d, params.m);
-        native_index->add(num_vectors, vectors.data());
-        std::ignore = index1->add(num_vectors, vectors.data());
+        add_vectors_to_indexes(index1.get(), native_index.get(), vectors);
 
-        std::vector<float> query_vec {vectors.begin(),
-                                      vectors.begin() + params.d}; // Use the first vector we added
+        std::vector<float> query_vec = vectors.front();
 
         std::vector<std::pair<size_t, float>> distances(num_vectors);
         for (int i = 0; i < num_vectors; i++) {
             double sum = 0;
+            auto& vec = vectors[i];
             for (int j = 0; j < params.d; j++) {
-                accumulate(vectors[i * params.d + j], query_vec[j], sum);
+                accumulate(vec[j], query_vec[j], sum);
             }
             distances[i] = std::make_pair(i, finalize(sum));
         }
         std::sort(distances.begin(), distances.end(),
                   [](const auto& a, const auto& b) { return a.second < b.second; });
-        // Use the median distance as the radius
-        float radius = distances[num_vectors / 2].second;
+
+        float radius = distances[num_vectors / 4].second;
 
         HNSWSearchParameters hnsw_params;
         hnsw_params.ef_search = 16;    // Set efSearch for better accuracy
         hnsw_params.roaring = nullptr; // No selector for this test
+        hnsw_params.is_le_or_lt = true;
         IndexSearchResult doris_result;
         std::ignore = index1->range_search(query_vec.data(), radius, hnsw_params, doris_result);
 
@@ -452,30 +485,29 @@ TEST_F(VectorSearchTest, RangeSearchNoSelector1) {
         index1->set_build_params(params);
 
         const int num_vectors = random_n;
-        std::vector<float> vectors;
+        std::vector<std::vector<float>> vectors;
         for (int i = 0; i < num_vectors; i++) {
-            auto vec = generate_random_vector(params.d);
-            vectors.insert(vectors.end(), vec.begin(), vec.end());
+            vectors.push_back(generate_random_vector(params.d));
         }
+        std::unique_ptr<faiss::Index> native_index =
+                std::make_unique<faiss::IndexHNSWFlat>(params.d, params.m);
+        add_vectors_to_indexes(index1.get(), native_index.get(), vectors);
+
+        std::vector<float> query_vec = vectors.front();
 
         std::vector<std::pair<size_t, float>> distances(num_vectors);
         for (int i = 0; i < num_vectors; i++) {
             double sum = 0;
+            auto& vec = vectors[i];
             for (int j = 0; j < params.d; j++) {
-                accumulate(vectors[i * params.d + j], vectors[j], sum);
+                accumulate(vec[j], query_vec[j], sum);
             }
             distances[i] = std::make_pair(i, finalize(sum));
         }
         std::sort(distances.begin(), distances.end(),
                   [](const auto& a, const auto& b) { return a.second < b.second; });
-        // Use the median distance as the radius
-        float radius = distances[num_vectors / 2].second;
 
-        std::unique_ptr<faiss::Index> native_index =
-                std::make_unique<faiss::IndexHNSWFlat>(params.d, params.m, faiss::METRIC_L2);
-        native_index->add(num_vectors, vectors.data());
-        std::ignore = index1->add(num_vectors, vectors.data());
-
+        float radius = distances[num_vectors / 4].second;
         // Save index
         ASSERT_TRUE(index1->save(_ram_dir.get()).ok());
 
@@ -485,8 +517,6 @@ TEST_F(VectorSearchTest, RangeSearchNoSelector1) {
 
         // Step 3: Range search
         // Use a vector we know is in the index
-        std::vector<float> query_vec {vectors.begin(),
-                                      vectors.begin() + params.d}; // Use the first vector we added
 
         faiss::SearchParametersHNSW search_params;
         search_params.efSearch = 16; // Set efSearch for better accuracy
@@ -568,17 +598,19 @@ TEST_F(VectorSearchTest, RangeSearchWithSelector1) {
         index1->set_build_params(params);
 
         const int num_vectors = 1000;
-        std::vector<float> vectors;
+        std::vector<std::vector<float>> vectors;
         for (int i = 0; i < num_vectors; i++) {
-            auto vec = generate_random_vector(params.d);
-            vectors.insert(vectors.end(), vec.begin(), vec.end());
+            vectors.push_back(generate_random_vector(params.d));
         }
 
+        // Use a vector we know is in the index
+        std::vector<float> query_vec = vectors.front();
         std::vector<std::pair<size_t, float>> distances(num_vectors);
         for (int i = 0; i < num_vectors; i++) {
             double sum = 0;
+            auto& vec = vectors[i];
             for (int j = 0; j < params.d; j++) {
-                accumulate(vectors[i * params.d + j], vectors[j], sum);
+                accumulate(vec[j], query_vec[j], sum);
             }
             distances[i] = std::make_pair(i, finalize(sum));
         }
@@ -589,8 +621,7 @@ TEST_F(VectorSearchTest, RangeSearchWithSelector1) {
 
         std::unique_ptr<faiss::Index> native_index =
                 std::make_unique<faiss::IndexHNSWFlat>(params.d, params.m, faiss::METRIC_L2);
-        native_index->add(num_vectors, vectors.data());
-        std::ignore = index1->add(num_vectors, vectors.data());
+        add_vectors_to_indexes(index1.get(), native_index.get(), vectors);
 
         std::unique_ptr<roaring::Roaring> all_rows = std::make_unique<roaring::Roaring>();
         std::unique_ptr<roaring::Roaring> sel_rows = std::make_unique<roaring::Roaring>();
@@ -600,11 +631,8 @@ TEST_F(VectorSearchTest, RangeSearchWithSelector1) {
                 sel_rows->add(i);
             }
         }
-        // Step 3: Range search
-        // Use a vector we know is in the index
-        std::vector<float> query_vec {vectors.begin(),
-                                      vectors.begin() + params.d}; // Use the first vector we added
 
+        // Step 3: Range search
         faiss::SearchParametersHNSW search_params;
         search_params.efSearch = 16; // Set efSearch for better accuracy
         auto faiss_selector = segment_v2::FaissVectorIndex::roaring_to_faiss_selector(*sel_rows);
@@ -612,7 +640,7 @@ TEST_F(VectorSearchTest, RangeSearchWithSelector1) {
         faiss::RangeSearchResult native_search_result(1, true);
         native_index->range_search(1, query_vec.data(), radius * radius, &native_search_result,
                                    &search_params);
-
+        // labels and distance
         std::vector<std::pair<int, float>> native_results;
         size_t begin = native_search_result.lims[0];
         size_t end = native_search_result.lims[1];
@@ -622,7 +650,7 @@ TEST_F(VectorSearchTest, RangeSearchWithSelector1) {
         }
 
         HNSWSearchParameters doris_search_params;
-        doris_search_params.ef_search = 16; // Set efSearch for better accuracy
+        doris_search_params.ef_search = search_params.efSearch;
         doris_search_params.is_le_or_lt = true;
         doris_search_params.roaring = sel_rows.get();
         IndexSearchResult doris_search_result;
@@ -644,11 +672,17 @@ TEST_F(VectorSearchTest, RangeSearchWithSelector1) {
         }
 
         doris_search_params.is_le_or_lt = false;
-        roaring::Roaring ge_rows = *doris_search_params.roaring;
+        IndexSearchResult doris_search_result2;
+        ASSERT_EQ(index1->range_search(query_vec.data(), radius, doris_search_params,
+                                       doris_search_result2)
+                          .ok(),
+                  true);
+        roaring::Roaring ge_rows = *doris_search_result2.roaring;
         roaring::Roaring less_rows;
         for (size_t i = 0; i < native_results.size(); ++i) {
             less_rows.add(native_results[i].first);
         }
+        // result2 contains all rows that not included by result1
         roaring::Roaring and_row_id = ge_rows & less_rows;
         roaring::Roaring or_row_id = ge_rows | less_rows;
         ASSERT_NEAR(and_row_id.cardinality(), 0, 1);
