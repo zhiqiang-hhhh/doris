@@ -104,6 +104,7 @@ OlapScanner::OlapScanner(pipeline::ScanLocalStateBase* parent, OlapScanner::Para
           }) {
     _tablet_reader_params.set_read_source(std::move(params.read_source));
     _is_init = false;
+    _vector_search_params = params.state->get_vector_search_params();
 }
 
 static std::string read_columns_to_string(TabletSchemaSPtr tablet_schema,
@@ -143,6 +144,7 @@ Status OlapScanner::init() {
     auto* local_state = static_cast<pipeline::OlapScanLocalState*>(_local_state);
     auto& tablet = _tablet_reader_params.tablet;
     auto& tablet_schema = _tablet_reader_params.tablet_schema;
+
     for (auto ctx : local_state->_common_expr_ctxs_push_down) {
         VExprContextSPtr context;
         RETURN_IF_ERROR(ctx->clone(_state, context));

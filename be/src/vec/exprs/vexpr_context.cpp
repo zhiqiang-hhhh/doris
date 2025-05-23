@@ -432,7 +432,7 @@ void VExprContext::_reset_memory_usage(const VExprContextSPtrs& contexts) {
                   [](auto&& context) { context->_memory_usage = 0; });
 }
 
-Status VExprContext::prepare_ann_range_search() {
+Status VExprContext::prepare_ann_range_search(doris::VectorSearchParams params) {
     if (_root == nullptr) {
         return Status::OK();
     }

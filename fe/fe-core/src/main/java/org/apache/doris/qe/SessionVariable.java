@@ -2611,6 +2611,12 @@ public class SessionVariable implements Serializable, Writable {
         return enableESParallelScroll;
     }
 
+    public int hnswEFSearch = 16;
+
+    public boolean hnswCheckRelativeDistance = true;
+
+    public boolean hnswBoundedQueue = true;
+
     // If this fe is in fuzzy mode, then will use initFuzzyModeVariables to generate some variables,
     // not the default value set in the code.
     @SuppressWarnings("checkstyle:Indentation")

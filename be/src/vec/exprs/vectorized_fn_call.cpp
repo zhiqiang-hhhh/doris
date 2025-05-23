@@ -327,7 +327,7 @@ bool VectorizedFnCall::equals(const VExpr& other) {
     SlotRef
 */
 
-Status VectorizedFnCall::prepare_ann_range_search() {
+Status VectorizedFnCall::prepare_ann_range_search(doris::VectorSearchParams params) {
     std::set<TExprOpcode::type> ops = {TExprOpcode::GE, TExprOpcode::LE, TExprOpcode::LE,
                                        TExprOpcode::GT, TExprOpcode::LT};
     if (ops.find(this->op()) == ops.end()) {

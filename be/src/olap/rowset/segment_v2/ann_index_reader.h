@@ -52,6 +52,7 @@ public:
     Status new_iterator(const io::IOContext& io_ctx, OlapReaderStatistics* stats,
                         RuntimeState* runtime_state,
                         std::unique_ptr<IndexIterator>* iterator) override;
+    std::string get_metric_type() const { return _metric_type; }
 
 private:
     TabletIndex _index_meta;
@@ -59,6 +60,7 @@ private:
     std::unique_ptr<VectorIndex> _vector_index;
     // TODO: Use integer.
     std::string _index_type;
+    std::string _metric_type;
 };
 
 using AnnIndexReaderPtr = std::shared_ptr<AnnIndexReader>;

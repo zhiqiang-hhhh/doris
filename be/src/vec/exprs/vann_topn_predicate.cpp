@@ -159,7 +159,7 @@ Status AnnTopNDescriptor::evaluate_vector_ann_search(
 std::string AnnTopNDescriptor::debug_string() const {
     return "AnnTopNDescriptor: limit=" + std::to_string(_limit) +
            ", src_col_idx=" + std::to_string(_src_column_idx) +
-           ", dest_col_idx=" + std::to_string(_dest_column_idx) +
+           ", dest_col_idx=" + std::to_string(_dest_column_idx) + ", asc=" + std::to_string(_asc) +
            ", order_by_expr=" + _order_by_expr_ctx->root()->debug_string();
 }
 } // namespace doris::vectorized

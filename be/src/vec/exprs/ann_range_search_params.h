@@ -22,6 +22,7 @@
 #include <string>
 
 #include "olap/rowset/segment_v2/ann_index_iterator.h"
+#include "runtime/runtime_state.h"
 
 namespace doris::vectorized {
 struct AnnRangeSearchParams {
@@ -30,7 +31,8 @@ struct AnnRangeSearchParams {
     size_t src_col_idx = 0;
     int64_t dst_col_idx = -1;
     double radius = 0.0;
-    int ef_search = 0;
+    doris::VectorSearchParams user_params;
+    int ef_search = 16;
     std::unique_ptr<float[]> query_value;
 
     segment_v2::RangeSearchParams toRangeSearchParams() {

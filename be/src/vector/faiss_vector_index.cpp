@@ -194,6 +194,10 @@ doris::Status FaissVectorIndex::range_search(const float* query_vec, const float
         faiss::SearchParametersHNSW param;
         param.efSearch = hnsw_params->ef_search;
         param.sel = sel ? sel.get() : nullptr;
+        if (params.roaring != nullptr) {
+            LOG_INFO("search radius: {}={}*{}, rows {}", radius*radius, radius, radius,
+                 params.roaring->cardinality());
+        }
         _index->range_search(1, query_vec, radius * radius, &native_search_result, &param);
     } else {
         faiss::SearchParameters param;

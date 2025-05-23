@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "common/status.h"
+#include "runtime/runtime_state.h"
 #include "udf/udf.h"
 #include "vec/core/column_numbers.h"
 #include "vec/exprs/ann_range_search_params.h"
@@ -82,7 +83,7 @@ public:
             const std::vector<std::unique_ptr<segment_v2::ColumnIterator>>& column_iterators,
             roaring::Roaring& row_bitmap) override;
 
-    Status prepare_ann_range_search() override;
+    Status prepare_ann_range_search(doris::VectorSearchParams params) override;
 
 protected:
     FunctionBasePtr _function;

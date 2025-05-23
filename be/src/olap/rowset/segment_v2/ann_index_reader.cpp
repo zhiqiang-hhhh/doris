@@ -49,6 +49,9 @@ AnnIndexReader::AnnIndexReader(const TabletIndex* index_meta,
     auto it = index_properties.find("index_type");
     DCHECK(it != index_properties.end());
     _index_type = it->second;
+    it = index_properties.find("metric_type");
+    DCHECK(it != index_properties.end());
+    _metric_type = it->second;
 }
 
 Status AnnIndexReader::new_iterator(const io::IOContext& io_ctx, OlapReaderStatistics* stats,
@@ -71,8 +74,10 @@ Status AnnIndexReader::load_index(io::IOContext* io_ctx) {
 }
 
 Status AnnIndexReader::query(io::IOContext* io_ctx, AnnIndexParam* param) {
+#ifndef BE_TEST
     RETURN_IF_ERROR(_index_file_reader->init(config::inverted_index_read_buffer_size, io_ctx));
     RETURN_IF_ERROR(load_index(io_ctx));
+#endif
     DCHECK(_vector_index != nullptr);
     const float* query_vec = param->query_value;
     const int limit = param->limit;
@@ -94,8 +99,10 @@ Status AnnIndexReader::query(io::IOContext* io_ctx, AnnIndexParam* param) {
 Status AnnIndexReader::range_search(const RangeSearchParams& params,
                                     const CustomSearchParams& custom_params,
                                     RangeSearchResult* result, io::IOContext* io_ctx) {
+#ifndef BE_TEST
     RETURN_IF_ERROR(_index_file_reader->init(config::inverted_index_read_buffer_size, io_ctx));
     RETURN_IF_ERROR(load_index(io_ctx));
+#endif
     DCHECK(_vector_index != nullptr);
     IndexSearchResult search_result;
     std::unique_ptr<IndexSearchParameters> search_param = nullptr;

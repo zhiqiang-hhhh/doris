@@ -30,6 +30,7 @@ struct AnnIndexParam {
     const float* query_value;
     const size_t query_value_size;
     size_t limit;
+    bool asc = true;
     roaring::Roaring* roaring;
     std::unique_ptr<std::vector<float>> distance = nullptr;
     std::unique_ptr<std::vector<uint64_t>> row_ids = nullptr;
