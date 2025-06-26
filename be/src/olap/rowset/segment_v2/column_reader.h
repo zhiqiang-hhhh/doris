@@ -72,9 +72,9 @@ class ColumnIterator;
 class BloomFilterIndexReader;
 class BitmapIndexIterator;
 class BitmapIndexReader;
-class InvertedIndexIterator;
+class IndexIterator;
 class InvertedIndexReader;
-class InvertedIndexFileReader;
+class IndexFileReader;
 class PageDecoder;
 class RowRanges;
 class ZoneMapIndexReader;
@@ -142,10 +142,10 @@ public:
     // Client should delete returned iterator
     Status new_bitmap_index_iterator(BitmapIndexIterator** iterator);
 
-    Status new_inverted_index_iterator(std::shared_ptr<InvertedIndexFileReader> index_file_reader,
+    Status new_inverted_index_iterator(std::shared_ptr<IndexFileReader> index_file_reader,
                                        const TabletIndex* index_meta,
                                        const StorageReadOptions& read_options,
-                                       std::unique_ptr<InvertedIndexIterator>* iterator);
+                                       std::unique_ptr<IndexIterator>* iterator);
 
     Status seek_at_or_before(ordinal_t ordinal, OrdinalPageIndexIterator* iter,
                              const ColumnIteratorOptions& iter_opts);
@@ -213,7 +213,7 @@ private:
 
     // Read column inverted indexes into memory
     // May be called multiple times, subsequent calls will no op.
-    Status _ensure_inverted_index_loaded(std::shared_ptr<InvertedIndexFileReader> index_file_reader,
+    Status _ensure_inverted_index_loaded(std::shared_ptr<IndexFileReader> index_file_reader,
                                          const TabletIndex* index_meta) {
         // load inverted index only if not loaded or index_id is changed
         RETURN_IF_ERROR(_load_inverted_index_index(index_file_reader, index_meta));
@@ -226,8 +226,7 @@ private:
                                              const ColumnIteratorOptions& iter_opts);
     [[nodiscard]] Status _load_bitmap_index(bool use_page_cache, bool kept_in_memory);
     [[nodiscard]] Status _load_inverted_index_index(
-            std::shared_ptr<InvertedIndexFileReader> index_file_reader,
-            const TabletIndex* index_meta);
+            std::shared_ptr<IndexFileReader> index_file_reader, const TabletIndex* index_meta);
     [[nodiscard]] Status _load_bloom_filter_index(bool use_page_cache, bool kept_in_memory,
                                                   const ColumnIteratorOptions& iter_opts);
 

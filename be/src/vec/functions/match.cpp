@@ -28,7 +28,7 @@ namespace doris::vectorized {
 Status FunctionMatchBase::evaluate_inverted_index(
         const ColumnsWithTypeAndName& arguments,
         const std::vector<vectorized::IndexFieldNameAndTypePair>& data_type_with_names,
-        std::vector<segment_v2::InvertedIndexIterator*> iterators, uint32_t num_rows,
+        std::vector<segment_v2::IndexIterator*> iterators, uint32_t num_rows,
         segment_v2::InvertedIndexResultBitmap& bitmap_result) const {
     DCHECK(arguments.size() == 1);
     DCHECK(data_type_with_names.size() == 1);
@@ -45,7 +45,7 @@ Status FunctionMatchBase::evaluate_inverted_index(
         if (iter->get_inverted_index_reader_type() == InvertedIndexReaderType::FULLTEXT &&
             get_parser_phrase_support_string_from_properties(iter->get_index_properties()) ==
                     INVERTED_INDEX_PARSER_PHRASE_SUPPORT_NO) {
-            return Status::Error<ErrorCode::INVERTED_INDEX_INVALID_PARAMETERS>(
+            return Status::Error<ErrorCode::INDEX_INVALID_PARAMETERS>(
                     "phrase queries require setting support_phrase = true");
         }
     }
@@ -58,7 +58,7 @@ Status FunctionMatchBase::evaluate_inverted_index(
     }
     auto param_type = arguments[0].type->get_primitive_type();
     if (!is_string_type(param_type)) {
-        return Status::Error<ErrorCode::INVERTED_INDEX_INVALID_PARAMETERS>(
+        return Status::Error<ErrorCode::INDEX_INVALID_PARAMETERS>(
                 "arguments for match must be string");
     }
     std::unique_ptr<InvertedIndexQueryParamFactory> query_param = nullptr;
@@ -70,7 +70,7 @@ Status FunctionMatchBase::evaluate_inverted_index(
                 iter->read_from_inverted_index(data_type_with_name.first, query_param->get_value(),
                                                inverted_index_query_type, num_rows, roaring));
     } else {
-        return Status::Error<ErrorCode::INVERTED_INDEX_INVALID_PARAMETERS>(
+        return Status::Error<ErrorCode::INDEX_INVALID_PARAMETERS>(
                 "invalid params type for FunctionMatchBase::evaluate_inverted_index {}",
                 param_type);
     }
@@ -467,13 +467,13 @@ Status FunctionMatchRegexp::execute_match(FunctionContext* context, const std::s
         err_message.append(compile_err->message);
         LOG(ERROR) << err_message;
         hs_free_compile_error(compile_err);
-        return Status::Error<ErrorCode::INVERTED_INDEX_INVALID_PARAMETERS>(err_message);
+        return Status::Error<ErrorCode::INDEX_INVALID_PARAMETERS>(err_message);
     }
 
     if (hs_alloc_scratch(database, &scratch) != HS_SUCCESS) {
         LOG(ERROR) << "hyperscan could not allocate scratch space.";
         hs_free_database(database);
-        return Status::Error<ErrorCode::INVERTED_INDEX_INVALID_PARAMETERS>(
+        return Status::Error<ErrorCode::INDEX_INVALID_PARAMETERS>(
                 "hyperscan could not allocate scratch space.");
     }
 

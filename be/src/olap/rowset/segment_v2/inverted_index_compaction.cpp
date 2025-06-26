@@ -17,10 +17,8 @@
 
 #include "inverted_index_compaction.h"
 
-#include "inverted_index_file_writer.h"
 #include "inverted_index_fs_directory.h"
 #include "io/fs/local_file_system.h"
-#include "olap/tablet_schema.h"
 #include "util/debug_points.h"
 
 namespace doris::segment_v2 {

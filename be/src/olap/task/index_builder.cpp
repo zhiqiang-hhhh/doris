@@ -23,9 +23,9 @@
 #include "olap/olap_define.h"
 #include "olap/rowset/beta_rowset.h"
 #include "olap/rowset/rowset_writer_context.h"
+#include "olap/rowset/segment_v2/index_file_reader.h"
+#include "olap/rowset/segment_v2/index_file_writer.h"
 #include "olap/rowset/segment_v2/inverted_index_desc.h"
-#include "olap/rowset/segment_v2/inverted_index_file_reader.h"
-#include "olap/rowset/segment_v2/inverted_index_file_writer.h"
 #include "olap/rowset/segment_v2/inverted_index_fs_directory.h"
 #include "olap/rowset/segment_v2/inverted_index_writer.h"
 #include "olap/segment_loader.h"
@@ -230,7 +230,7 @@ Status IndexBuilder::update_inverted_index_info() {
         } else {
             for (int seg_id = 0; seg_id < num_segments; seg_id++) {
                 auto seg_path = DORIS_TRY(input_rowset->segment_path(seg_id));
-                auto idx_file_reader = std::make_unique<InvertedIndexFileReader>(
+                auto idx_file_reader = std::make_unique<IndexFileReader>(
                         context.fs(),
                         std::string {InvertedIndexDescriptor::get_index_file_path_prefix(seg_path)},
                         output_rs_tablet_schema->get_inverted_index_storage_format());
@@ -319,7 +319,7 @@ Status IndexBuilder::handle_single_rowset(RowsetMetaSharedPtr output_rowset_meta
                                  << ", err: " << st;
                     return st;
                 }
-                auto inverted_index_file_writer = std::make_unique<InvertedIndexFileWriter>(
+                auto inverted_index_file_writer = std::make_unique<IndexFileWriter>(
                         fs, std::move(index_path_prefix),
                         output_rowset_meta->rowset_id().to_string(), seg_ptr->id(),
                         output_rowset_schema->get_inverted_index_storage_format(),
@@ -363,7 +363,7 @@ Status IndexBuilder::handle_single_rowset(RowsetMetaSharedPtr output_rowset_meta
             std::vector<std::pair<int64_t, int64_t>> inverted_index_writer_signs;
             _olap_data_convertor->reserve(_alter_inverted_indexes.size());
 
-            std::unique_ptr<InvertedIndexFileWriter> inverted_index_file_writer = nullptr;
+            std::unique_ptr<IndexFileWriter> inverted_index_file_writer = nullptr;
             if (output_rowset_schema->get_inverted_index_storage_format() >=
                 InvertedIndexStorageFormatPB::V2) {
                 auto idx_file_reader_iter = _inverted_index_file_readers.find(
@@ -385,13 +385,13 @@ Status IndexBuilder::handle_single_rowset(RowsetMetaSharedPtr output_rowset_meta
                     return st;
                 }
                 auto dirs = DORIS_TRY(idx_file_reader_iter->second->get_all_directories());
-                inverted_index_file_writer = std::make_unique<InvertedIndexFileWriter>(
+                inverted_index_file_writer = std::make_unique<IndexFileWriter>(
                         fs, index_path_prefix, output_rowset_meta->rowset_id().to_string(),
                         seg_ptr->id(), output_rowset_schema->get_inverted_index_storage_format(),
                         std::move(file_writer));
                 RETURN_IF_ERROR(inverted_index_file_writer->initialize(dirs));
             } else {
-                inverted_index_file_writer = std::make_unique<InvertedIndexFileWriter>(
+                inverted_index_file_writer = std::make_unique<IndexFileWriter>(
                         fs, index_path_prefix, output_rowset_meta->rowset_id().to_string(),
                         seg_ptr->id(), output_rowset_schema->get_inverted_index_storage_format());
             }

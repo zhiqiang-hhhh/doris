@@ -56,7 +56,7 @@ InvertedIndexQueryType get_query_type(const std::string& query_type) {
 Status FunctionMultiMatch::evaluate_inverted_index(
         const ColumnsWithTypeAndName& arguments,
         const std::vector<vectorized::IndexFieldNameAndTypePair>& data_type_with_names,
-        std::vector<segment_v2::InvertedIndexIterator*> iterators, uint32_t num_rows,
+        std::vector<segment_v2::IndexIterator*> iterators, uint32_t num_rows,
         segment_v2::InvertedIndexResultBitmap& bitmap_result) const {
     DCHECK(arguments.size() == 2);
     std::shared_ptr<roaring::Roaring> roaring = std::make_shared<roaring::Roaring>();
@@ -75,7 +75,7 @@ Status FunctionMultiMatch::evaluate_inverted_index(
     auto query_str = arguments[1].column->get_data_at(0);
     auto param_type = arguments[1].type->get_primitive_type();
     if (!is_string_type(param_type)) {
-        return Status::Error<ErrorCode::INVERTED_INDEX_INVALID_PARAMETERS>(
+        return Status::Error<ErrorCode::INDEX_INVALID_PARAMETERS>(
                 "arguments for multi_match must be string");
     }
 

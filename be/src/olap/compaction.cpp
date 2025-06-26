@@ -61,10 +61,10 @@
 #include "olap/rowset/rowset_meta.h"
 #include "olap/rowset/rowset_writer.h"
 #include "olap/rowset/rowset_writer_context.h"
+#include "olap/rowset/segment_v2/index_file_reader.h"
+#include "olap/rowset/segment_v2/index_file_writer.h"
 #include "olap/rowset/segment_v2/inverted_index_compaction.h"
 #include "olap/rowset/segment_v2/inverted_index_desc.h"
-#include "olap/rowset/segment_v2/inverted_index_file_reader.h"
-#include "olap/rowset/segment_v2/inverted_index_file_writer.h"
 #include "olap/rowset/segment_v2/inverted_index_fs_directory.h"
 #include "olap/storage_engine.h"
 #include "olap/storage_policy.h"
@@ -672,8 +672,7 @@ Status Compaction::do_inverted_index_compaction() {
     }
 
     // src index dirs
-    std::vector<std::unique_ptr<InvertedIndexFileReader>> inverted_index_file_readers(
-            src_segment_num);
+    std::vector<std::unique_ptr<IndexFileReader>> inverted_index_file_readers(src_segment_num);
     for (const auto& m : src_seg_to_id_map) {
         const auto& [rowset_id, seg_id] = m.first;
 
@@ -714,7 +713,7 @@ Status Compaction::do_inverted_index_compaction() {
                     "get segment path failed. tablet_id={} rowset_id={} seg_id={}",
                     _tablet->tablet_id(), rowset_id.to_string(), seg_id);
         }
-        auto inverted_index_file_reader = std::make_unique<InvertedIndexFileReader>(
+        auto inverted_index_file_reader = std::make_unique<IndexFileReader>(
                 fs,
                 std::string {InvertedIndexDescriptor::get_index_file_path_prefix(seg_path.value())},
                 _cur_tablet_schema->get_inverted_index_storage_format(),
@@ -954,7 +953,7 @@ void Compaction::construct_index_compaction_columns(RowsetWriterContext& ctx) {
 
                 std::string index_file_path;
                 try {
-                    auto inverted_index_file_reader = std::make_unique<InvertedIndexFileReader>(
+                    auto inverted_index_file_reader = std::make_unique<IndexFileReader>(
                             fs,
                             std::string {InvertedIndexDescriptor::get_index_file_path_prefix(
                                     seg_path.value())},

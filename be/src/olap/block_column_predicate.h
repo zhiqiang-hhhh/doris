@@ -43,7 +43,7 @@ class WrapperField;
 
 namespace segment_v2 {
 class BloomFilter;
-class InvertedIndexIterator;
+class IndexIterator;
 } // namespace segment_v2
 
 // Block Column Predicate support do column predicate and support OR and AND predicate
@@ -94,7 +94,7 @@ public:
     virtual bool can_do_bloom_filter(bool ngram) const { return false; }
 
     //evaluate predicate on inverted
-    virtual Status evaluate(const std::string& column_name, InvertedIndexIterator* iterator,
+    virtual Status evaluate(const std::string& column_name, IndexIterator* iterator,
                             uint32_t num_rows, roaring::Roaring* bitmap) const {
         return Status::Error<ErrorCode::INVERTED_INDEX_NOT_IMPLEMENTED>(
                 "Not Implemented evaluate with inverted index, please check the predicate");
@@ -229,8 +229,8 @@ public:
         return true;
     }
 
-    Status evaluate(const std::string& column_name, InvertedIndexIterator* iterator,
-                    uint32_t num_rows, roaring::Roaring* bitmap) const override;
+    Status evaluate(const std::string& column_name, IndexIterator* iterator, uint32_t num_rows,
+                    roaring::Roaring* bitmap) const override;
 };
 
 } //namespace doris

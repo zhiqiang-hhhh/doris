@@ -26,7 +26,7 @@ class Roaring;
 namespace doris {
 class WrapperField;
 namespace segment_v2 {
-class InvertedIndexIterator;
+class IndexIterator;
 } // namespace segment_v2
 
 uint16_t SingleColumnBlockPredicate::evaluate(vectorized::MutableColumns& block, uint16_t* sel,
@@ -211,9 +211,8 @@ void AndBlockColumnPredicate::evaluate_vec(vectorized::MutableColumns& block, ui
     }
 }
 
-Status AndBlockColumnPredicate::evaluate(const std::string& column_name,
-                                         InvertedIndexIterator* iterator, uint32_t num_rows,
-                                         roaring::Roaring* bitmap) const {
+Status AndBlockColumnPredicate::evaluate(const std::string& column_name, IndexIterator* iterator,
+                                         uint32_t num_rows, roaring::Roaring* bitmap) const {
     return Status::Error<ErrorCode::INVERTED_INDEX_NOT_IMPLEMENTED>(
             "Not Implemented evaluate with inverted index, please check the predicate");
 }

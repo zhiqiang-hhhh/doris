@@ -67,7 +67,7 @@ namespace segment_v2 {
 
 class BitmapIndexIterator;
 class ColumnIterator;
-class InvertedIndexIterator;
+class IndexIterator;
 class RowRanges;
 struct ColumnPredicateInfo {
     ColumnPredicateInfo() = default;
@@ -149,7 +149,7 @@ public:
         }
     }
 
-    std::vector<std::unique_ptr<InvertedIndexIterator>>& inverted_index_iterators() {
+    std::vector<std::unique_ptr<IndexIterator>>& inverted_index_iterators() {
         return _inverted_index_iterators;
     }
 
@@ -386,7 +386,7 @@ private:
     // vector idx -> column iterarator
     std::vector<std::unique_ptr<ColumnIterator>> _column_iterators;
     std::vector<std::unique_ptr<BitmapIndexIterator>> _bitmap_index_iterators;
-    std::vector<std::unique_ptr<InvertedIndexIterator>> _inverted_index_iterators;
+    std::vector<std::unique_ptr<IndexIterator>> _inverted_index_iterators;
     // after init(), `_row_bitmap` contains all rowid to scan
     roaring::Roaring _row_bitmap;
     // an iterator for `_row_bitmap` that can be used to extract row range to scan

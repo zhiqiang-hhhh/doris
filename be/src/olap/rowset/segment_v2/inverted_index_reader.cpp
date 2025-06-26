@@ -42,11 +42,11 @@
 #include "olap/inverted_index_parser.h"
 #include "olap/key_coder.h"
 #include "olap/olap_common.h"
+#include "olap/rowset/segment_v2/index_file_reader.h"
 #include "olap/rowset/segment_v2/inverted_index/analyzer/analyzer.h"
 #include "olap/rowset/segment_v2/inverted_index/query/phrase_query.h"
 #include "olap/rowset/segment_v2/inverted_index/query/query_factory.h"
 #include "olap/rowset/segment_v2/inverted_index_cache.h"
-#include "olap/rowset/segment_v2/inverted_index_file_reader.h"
 #include "olap/rowset/segment_v2/inverted_index_fs_directory.h"
 #include "olap/rowset/segment_v2/inverted_index_searcher.h"
 #include "olap/types.h"
@@ -284,7 +284,7 @@ Status InvertedIndexReader::match_index_search(
         SCOPED_RAW_TIMER(&stats->inverted_index_searcher_search_timer);
         auto query = QueryFactory::create(query_type, index_searcher, queryOptions, io_ctx);
         if (!query) {
-            return Status::Error<ErrorCode::INVERTED_INDEX_INVALID_PARAMETERS>(
+            return Status::Error<ErrorCode::INDEX_INVALID_PARAMETERS>(
                     "query type " + query_type_to_string(query_type) + ", query is nullptr");
         }
         query->add(query_info);
@@ -301,9 +301,8 @@ Status InvertedIndexReader::match_index_search(
 
 Status FullTextIndexReader::new_iterator(const io::IOContext& io_ctx, OlapReaderStatistics* stats,
                                          RuntimeState* runtime_state,
-                                         std::unique_ptr<InvertedIndexIterator>* iterator) {
-    *iterator =
-            InvertedIndexIterator::create_unique(io_ctx, stats, runtime_state, shared_from_this());
+                                         std::unique_ptr<IndexIterator>* iterator) {
+    *iterator = IndexIterator::create_unique(io_ctx, stats, runtime_state, shared_from_this());
     return Status::OK();
 }
 
@@ -394,11 +393,11 @@ InvertedIndexReaderType FullTextIndexReader::type() {
     return InvertedIndexReaderType::FULLTEXT;
 }
 
-Status StringTypeInvertedIndexReader::new_iterator(
-        const io::IOContext& io_ctx, OlapReaderStatistics* stats, RuntimeState* runtime_state,
-        std::unique_ptr<InvertedIndexIterator>* iterator) {
-    *iterator =
-            InvertedIndexIterator::create_unique(io_ctx, stats, runtime_state, shared_from_this());
+Status StringTypeInvertedIndexReader::new_iterator(const io::IOContext& io_ctx,
+                                                   OlapReaderStatistics* stats,
+                                                   RuntimeState* runtime_state,
+                                                   std::unique_ptr<IndexIterator>* iterator) {
+    *iterator = IndexIterator::create_unique(io_ctx, stats, runtime_state, shared_from_this());
     return Status::OK();
 }
 
@@ -534,9 +533,8 @@ InvertedIndexReaderType StringTypeInvertedIndexReader::type() {
 
 Status BkdIndexReader::new_iterator(const io::IOContext& io_ctx, OlapReaderStatistics* stats,
                                     RuntimeState* runtime_state,
-                                    std::unique_ptr<InvertedIndexIterator>* iterator) {
-    *iterator =
-            InvertedIndexIterator::create_unique(io_ctx, stats, runtime_state, shared_from_this());
+                                    std::unique_ptr<IndexIterator>* iterator) {
+    *iterator = IndexIterator::create_unique(io_ctx, stats, runtime_state, shared_from_this());
     return Status::OK();
 }
 
@@ -1158,7 +1156,7 @@ lucene::util::bkd::relation InvertedIndexVisitor<QT>::compare(std::vector<uint8_
     }
 }
 
-Status InvertedIndexIterator::read_from_inverted_index(
+Status IndexIterator::read_from_inverted_index(
         const std::string& column_name, const void* query_value, InvertedIndexQueryType query_type,
         uint32_t segment_num_rows, std::shared_ptr<roaring::Roaring>& bit_map, bool skip_try) {
     DBUG_EXECUTE_IF("return_inverted_index_bypass", {
@@ -1206,10 +1204,10 @@ Status InvertedIndexIterator::read_from_inverted_index(
     return Status::OK();
 }
 
-Status InvertedIndexIterator::try_read_from_inverted_index(const std::string& column_name,
-                                                           const void* query_value,
-                                                           InvertedIndexQueryType query_type,
-                                                           uint32_t* count) {
+Status IndexIterator::try_read_from_inverted_index(const std::string& column_name,
+                                                   const void* query_value,
+                                                   InvertedIndexQueryType query_type,
+                                                   uint32_t* count) {
     // NOTE: only bkd index support try read now.
     if (query_type == InvertedIndexQueryType::GREATER_EQUAL_QUERY ||
         query_type == InvertedIndexQueryType::GREATER_THAN_QUERY ||
@@ -1222,11 +1220,11 @@ Status InvertedIndexIterator::try_read_from_inverted_index(const std::string& co
     return Status::OK();
 }
 
-InvertedIndexReaderType InvertedIndexIterator::get_inverted_index_reader_type() const {
+InvertedIndexReaderType IndexIterator::get_inverted_index_reader_type() const {
     return _reader->type();
 }
 
-const std::map<std::string, std::string>& InvertedIndexIterator::get_index_properties() const {
+const std::map<std::string, std::string>& IndexIterator::get_index_properties() const {
     return _reader->get_index_properties();
 }
 

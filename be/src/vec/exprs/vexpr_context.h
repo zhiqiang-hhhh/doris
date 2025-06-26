@@ -44,8 +44,7 @@ class InvertedIndexContext {
 public:
     InvertedIndexContext(
             const std::vector<ColumnId>& col_ids,
-            const std::vector<std::unique_ptr<segment_v2::InvertedIndexIterator>>&
-                    inverted_index_iterators,
+            const std::vector<std::unique_ptr<segment_v2::IndexIterator>>& inverted_index_iterators,
             const std::vector<vectorized::IndexFieldNameAndTypePair>& storage_name_and_type_vec,
             std::unordered_map<ColumnId, std::unordered_map<const vectorized::VExpr*, bool>>&
                     common_expr_inverted_index_status)
@@ -54,8 +53,7 @@ public:
               _storage_name_and_type(storage_name_and_type_vec),
               _expr_inverted_index_status(common_expr_inverted_index_status) {}
 
-    segment_v2::InvertedIndexIterator* get_inverted_index_iterator_by_column_id(
-            int column_index) const {
+    segment_v2::IndexIterator* get_inverted_index_iterator_by_column_id(int column_index) const {
         if (column_index < 0 || column_index >= _col_ids.size()) {
             return nullptr;
         }
@@ -130,8 +128,7 @@ private:
     const std::vector<ColumnId>& _col_ids;
 
     // A reference to a vector of unique pointers to inverted index iterators.
-    const std::vector<std::unique_ptr<segment_v2::InvertedIndexIterator>>&
-            _inverted_index_iterators;
+    const std::vector<std::unique_ptr<segment_v2::IndexIterator>>& _inverted_index_iterators;
 
     // A reference to a vector of storage name and type pairs related to schema.
     const std::vector<vectorized::IndexFieldNameAndTypePair>& _storage_name_and_type;

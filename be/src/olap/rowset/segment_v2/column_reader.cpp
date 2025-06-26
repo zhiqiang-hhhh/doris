@@ -45,7 +45,7 @@
 #include "olap/rowset/segment_v2/bloom_filter_index_reader.h"
 #include "olap/rowset/segment_v2/encoding_info.h" // for EncodingInfo
 #include "olap/rowset/segment_v2/inverted_index/analyzer/analyzer.h"
-#include "olap/rowset/segment_v2/inverted_index_file_reader.h"
+#include "olap/rowset/segment_v2/index_file_reader.h"
 #include "olap/rowset/segment_v2/inverted_index_reader.h"
 #include "olap/rowset/segment_v2/page_decoder.h"
 #include "olap/rowset/segment_v2/page_handle.h" // for PageHandle
@@ -338,9 +338,10 @@ Status ColumnReader::new_bitmap_index_iterator(BitmapIndexIterator** iterator) {
     return Status::OK();
 }
 
-Status ColumnReader::new_inverted_index_iterator(
-        std::shared_ptr<InvertedIndexFileReader> index_file_reader, const TabletIndex* index_meta,
-        const StorageReadOptions& read_options, std::unique_ptr<InvertedIndexIterator>* iterator) {
+Status ColumnReader::new_inverted_index_iterator(std::shared_ptr<IndexFileReader> index_file_reader,
+                                                 const TabletIndex* index_meta,
+                                                 const StorageReadOptions& read_options,
+                                                 std::unique_ptr<IndexIterator>* iterator) {
     RETURN_IF_ERROR(_ensure_inverted_index_loaded(std::move(index_file_reader), index_meta));
     {
         std::shared_lock<std::shared_mutex> rlock(_load_index_lock);
@@ -624,8 +625,8 @@ Status ColumnReader::_load_bitmap_index(bool use_page_cache, bool kept_in_memory
     return Status::OK();
 }
 
-Status ColumnReader::_load_inverted_index_index(
-        std::shared_ptr<InvertedIndexFileReader> index_file_reader, const TabletIndex* index_meta) {
+Status ColumnReader::_load_inverted_index_index(std::shared_ptr<IndexFileReader> index_file_reader,
+                                                const TabletIndex* index_meta) {
     std::unique_lock<std::shared_mutex> wlock(_load_index_lock);
 
     if (_inverted_index && index_meta &&

@@ -45,8 +45,8 @@
 #include "olap/rowset/segment_v2/column_reader.h"
 #include "olap/rowset/segment_v2/empty_segment_iterator.h"
 #include "olap/rowset/segment_v2/hierarchical_data_reader.h"
+#include "olap/rowset/segment_v2/index_file_reader.h"
 #include "olap/rowset/segment_v2/indexed_column_reader.h"
-#include "olap/rowset/segment_v2/inverted_index_file_reader.h"
 #include "olap/rowset/segment_v2/page_io.h"
 #include "olap/rowset/segment_v2/page_pointer.h"
 #include "olap/rowset/segment_v2/segment_iterator.h"
@@ -76,7 +76,7 @@
 
 namespace doris::segment_v2 {
 
-class InvertedIndexIterator;
+class IndexIterator;
 
 Status Segment::open(io::FileSystemSPtr fs, const std::string& path, int64_t tablet_id,
                      uint32_t segment_id, RowsetId rowset_id, TabletSchemaSPtr tablet_schema,
@@ -210,7 +210,7 @@ Status Segment::_open(OlapReaderStatistics* stats) {
 }
 
 Status Segment::_open_inverted_index() {
-    _inverted_index_file_reader = std::make_shared<InvertedIndexFileReader>(
+    _inverted_index_file_reader = std::make_shared<IndexFileReader>(
             _fs,
             std::string {InvertedIndexDescriptor::get_index_file_path_prefix(
                     _file_reader->path().native())},
@@ -958,7 +958,7 @@ Status Segment::new_bitmap_index_iterator(const TabletColumn& tablet_column,
 Status Segment::new_inverted_index_iterator(const TabletColumn& tablet_column,
                                             const TabletIndex* index_meta,
                                             const StorageReadOptions& read_options,
-                                            std::unique_ptr<InvertedIndexIterator>* iter) {
+                                            std::unique_ptr<IndexIterator>* iter) {
     if (read_options.runtime_state != nullptr) {
         _be_exec_version = read_options.runtime_state->be_exec_version();
     }
