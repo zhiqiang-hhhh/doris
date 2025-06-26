@@ -30,9 +30,9 @@
 #include "io/fs/local_file_system.h"
 #include "olap/lru_cache.h"
 #include "olap/olap_common.h"
+#include "olap/rowset/segment_v2/index_reader.h"
 #include "olap/rowset/segment_v2/inverted_index_cache.h"
 #include "olap/rowset/segment_v2/inverted_index_desc.h"
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
 #include "util/time.h"
 
 namespace doris {

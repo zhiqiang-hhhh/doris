@@ -15,8 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
-
 #include <CLucene/debug/error.h>
 #include <CLucene/debug/mem.h>
 #include <CLucene/index/Term.h>
@@ -43,6 +41,7 @@
 #include "olap/key_coder.h"
 #include "olap/olap_common.h"
 #include "olap/rowset/segment_v2/index_file_reader.h"
+#include "olap/rowset/segment_v2/index_reader.h"
 #include "olap/rowset/segment_v2/inverted_index/analyzer/analyzer.h"
 #include "olap/rowset/segment_v2/inverted_index/query/phrase_query.h"
 #include "olap/rowset/segment_v2/inverted_index/query/query_factory.h"

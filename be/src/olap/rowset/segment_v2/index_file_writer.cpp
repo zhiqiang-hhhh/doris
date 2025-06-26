@@ -26,10 +26,10 @@
 #include "common/status.h"
 #include "io/fs/stream_sink_file_writer.h"
 #include "olap/rowset/segment_v2/index_file_reader.h"
+#include "olap/rowset/segment_v2/index_reader.h"
 #include "olap/rowset/segment_v2/inverted_index_compound_reader.h"
 #include "olap/rowset/segment_v2/inverted_index_desc.h"
 #include "olap/rowset/segment_v2/inverted_index_fs_directory.h"
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
 #include "olap/tablet_schema.h"
 
 namespace doris::segment_v2 {
@@ -264,7 +264,7 @@ void IndexFileWriter::copyFile(const char* fileName, lucene::store::Directory* d
     });
     if (!open) {
         if (err.number() == CL_ERR_EmptyIndexSegment) {
-            LOG(WARNING) << "InvertedIndexFileWriter::copyFile: " << fileName << " is empty";
+            LOG(WARNING) << "IndexFileWriter::copyFile: " << fileName << " is empty";
             return;
         }
         throw err;

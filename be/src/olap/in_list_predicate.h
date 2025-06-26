@@ -25,8 +25,8 @@
 #include "olap/column_predicate.h"
 #include "olap/olap_common.h"
 #include "olap/rowset/segment_v2/bloom_filter.h"
+#include "olap/rowset/segment_v2/index_reader.h"
 #include "olap/rowset/segment_v2/inverted_index_cache.h" // IWYU pragma: keep
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
 #include "olap/wrapper_field.h"
 #include "runtime/define_primitive_type.h"
 #include "runtime/primitive_type.h"

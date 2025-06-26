@@ -19,7 +19,7 @@
 
 #include <gtest/gtest.h>
 
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
+#include "olap/rowset/segment_v2/index_reader.h"
 #include "vec/core/column_with_type_and_name.h"
 #include "vec/core/columns_with_type_and_name.h"
 #include "vec/data_types/data_type_string.h"
@@ -54,7 +54,7 @@ protected:
     std::string query_str;
     ColumnsWithTypeAndName arguments;
     std::vector<IndexFieldNameAndTypePair> data_type_with_names;
-    std::vector<segment_v2::InvertedIndexIterator*> iterators;
+    std::vector<segment_v2::IndexIterator*> iterators;
 };
 
 TEST_F(FunctionMultiMatchTest, EvaluateInvertedIndexWithNullIterator) {

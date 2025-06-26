@@ -22,8 +22,8 @@
 #include <roaring/roaring.hh>
 
 #include "olap/rowset/segment_v2/bitmap_index_reader.h"
+#include "olap/rowset/segment_v2/index_reader.h"
 #include "olap/rowset/segment_v2/inverted_index_cache.h"
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
 #include "vec/columns/column.h"
 #include "vec/columns/column_nullable.h"
 #include "vec/runtime/vdatetime_value.h"

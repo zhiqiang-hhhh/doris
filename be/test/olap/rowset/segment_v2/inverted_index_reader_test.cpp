@@ -15,8 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
-
 #include <CLucene.h>
 #include <gen_cpp/olap_file.pb.h>
 #include <gtest/gtest.h>
@@ -29,8 +27,9 @@
 #include <vector>
 
 #include "olap/field.h"
+#include "olap/rowset/segment_v2/index_file_reader.h"
+#include "olap/rowset/segment_v2/index_reader.h"
 #include "olap/rowset/segment_v2/inverted_index_desc.h"
-#include "olap/rowset/segment_v2/inverted_index_file_reader.h"
 #include "olap/rowset/segment_v2/inverted_index_file_writer.h"
 #include "olap/rowset/segment_v2/inverted_index_writer.h"
 #include "olap/tablet_schema.h"
@@ -128,9 +127,9 @@ public:
         auto fs = io::global_local_filesystem();
         Status sts = fs->create_file(index_path, &file_writer, &opts);
         ASSERT_TRUE(sts.ok()) << sts;
-        auto index_file_writer = std::make_unique<InvertedIndexFileWriter>(
-                fs, *index_path_prefix, std::string {rowset_id}, seg_id, format,
-                std::move(file_writer));
+        auto index_file_writer =
+                std::make_unique<IndexFileWriter>(fs, *index_path_prefix, std::string {rowset_id},
+                                                  seg_id, format, std::move(file_writer));
 
         // Get c2 column Field
         const TabletColumn& column = tablet_schema->column(1);
@@ -180,7 +179,7 @@ public:
         auto fs = io::global_local_filesystem();
         Status sts = fs->create_file(index_path, &file_writer, &opts);
         ASSERT_TRUE(sts.ok()) << sts;
-        auto index_file_writer = std::make_unique<InvertedIndexFileWriter>(
+        auto index_file_writer = std::make_unique<IndexFileWriter>(
                 fs, *index_path_prefix, std::string {rowset_id}, seg_id,
                 InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 
@@ -246,7 +245,7 @@ public:
         auto fs = io::global_local_filesystem();
         Status sts = fs->create_file(index_path, &file_writer, &opts);
         ASSERT_TRUE(sts.ok()) << sts;
-        auto index_file_writer = std::make_unique<InvertedIndexFileWriter>(
+        auto index_file_writer = std::make_unique<IndexFileWriter>(
                 fs, *index_path_prefix, std::string {rowset_id}, seg_id,
                 InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 
@@ -2289,7 +2288,7 @@ public:
         io::IOContext io_ctx;
 
         // Test iterator creation
-        std::unique_ptr<InvertedIndexIterator> iterator;
+        std::unique_ptr<IndexIterator> iterator;
         auto status = str_reader->new_iterator(io_ctx, &stats, &runtime_state, &iterator);
         EXPECT_TRUE(status.ok());
         EXPECT_NE(iterator, nullptr);
@@ -2445,7 +2444,7 @@ public:
         auto fs = io::global_local_filesystem();
         Status sts = fs->create_file(index_path, &file_writer, &opts);
         ASSERT_TRUE(sts.ok()) << sts;
-        auto index_file_writer = std::make_unique<InvertedIndexFileWriter>(
+        auto index_file_writer = std::make_unique<IndexFileWriter>(
                 fs, *index_path_prefix, std::string {rowset_id}, seg_id,
                 InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 
@@ -2773,7 +2772,7 @@ public:
         EXPECT_TRUE(status.ok());
     }
 
-    // Test InvertedIndexIterator uncovered paths
+    // Test IndexIterator uncovered paths
     void test_iterator_uncovered_paths() {
         std::string_view rowset_id = "test_iterator_uncovered";
         int seg_id = 0;
@@ -2798,7 +2797,7 @@ public:
         auto bkd_reader = BkdIndexReader::create_shared(&idx_meta, reader);
         EXPECT_NE(bkd_reader, nullptr);
 
-        std::unique_ptr<InvertedIndexIterator> iterator;
+        std::unique_ptr<IndexIterator> iterator;
         auto status = bkd_reader->new_iterator(io_ctx, &stats, &runtime_state, &iterator);
         EXPECT_TRUE(status.ok());
         EXPECT_NE(iterator, nullptr);
@@ -2894,9 +2893,9 @@ public:
         auto fs = io::global_local_filesystem();
         Status sts = fs->create_file(index_path, &file_writer, &opts);
         ASSERT_TRUE(sts.ok()) << sts;
-        auto index_file_writer = std::make_unique<InvertedIndexFileWriter>(
-                fs, *index_path_prefix, std::string {rowset_id}, seg_id, format,
-                std::move(file_writer));
+        auto index_file_writer =
+                std::make_unique<IndexFileWriter>(fs, *index_path_prefix, std::string {rowset_id},
+                                                  seg_id, format, std::move(file_writer));
 
         const TabletColumn& column = tablet_schema->column(col_id);
         std::unique_ptr<Field> field(FieldFactory::create(column));
@@ -3300,7 +3299,7 @@ public:
         Status sts = fs->create_file(index_path, &file_writer, &opts);
         ASSERT_TRUE(sts.ok()) << sts;
 
-        auto index_file_writer = std::make_unique<InvertedIndexFileWriter>(
+        auto index_file_writer = std::make_unique<IndexFileWriter>(
                 fs, std::string(index_path_prefix), rowset_id, seg_id,
                 InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 

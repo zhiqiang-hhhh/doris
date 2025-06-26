@@ -23,7 +23,7 @@
 #include "common/exception.h"
 #include "olap/rowset/segment_v2/bitmap_index_reader.h"
 #include "olap/rowset/segment_v2/bloom_filter.h"
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
+#include "olap/rowset/segment_v2/index_reader.h"
 #include "runtime/define_primitive_type.h"
 #include "util/runtime_profile.h"
 #include "vec/columns/column.h"

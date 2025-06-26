@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "common/status.h"
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
+#include "olap/rowset/segment_v2/index_reader.h"
 #include "udf/udf.h"
 #include "vec/columns/column_array.h"
 #include "vec/core/column_numbers.h"

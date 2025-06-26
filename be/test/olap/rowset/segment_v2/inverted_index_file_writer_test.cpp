@@ -29,7 +29,7 @@ namespace doris::segment_v2 {
 
 using namespace doris::vectorized;
 
-class InvertedIndexFileWriterTest : public ::testing::Test {
+class IndexFileWriterTest : public ::testing::Test {
 protected:
     class MockDorisFSDirectoryFileLength : public DorisFSDirectory {
     public:
@@ -112,9 +112,9 @@ protected:
     constexpr static std::string_view tmp_dir = "./ut_dir/tmp";
 };
 
-TEST_F(InvertedIndexFileWriterTest, InitializeTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+TEST_F(IndexFileWriterTest, InitializeTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     InvertedIndexDirectoryMap indices_dirs;
     indices_dirs.emplace(std::make_pair(1, "suffix1"), std::make_unique<DorisFSDirectory>());
@@ -126,9 +126,9 @@ TEST_F(InvertedIndexFileWriterTest, InitializeTest) {
     ASSERT_EQ(writer.get_storage_format(), InvertedIndexStorageFormatPB::V2);
 }
 
-TEST_F(InvertedIndexFileWriterTest, OpenTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+TEST_F(IndexFileWriterTest, OpenTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     int64_t index_id = 1;
     std::string index_suffix = "suffix1";
@@ -145,12 +145,12 @@ TEST_F(InvertedIndexFileWriterTest, OpenTest) {
     ASSERT_TRUE(writer._indices_dirs.find(key)->second.get() == dir.get());
 }
 
-TEST_F(InvertedIndexFileWriterTest, OpenWithoutRamDirTest) {
+TEST_F(IndexFileWriterTest, OpenWithoutRamDirTest) {
     // This test verifies that when _can_use_ram_dir is set to false,
-    // the directory created by InvertedIndexFileWriter::open is not a RAM directory
+    // the directory created by IndexFileWriter::open is not a RAM directory
     config::inverted_index_ram_dir_enable_when_base_compaction = false;
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2, nullptr, false);
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2, nullptr, false);
 
     int64_t index_id = 1;
     std::string index_suffix = "suffix_no_ram";
@@ -174,13 +174,13 @@ TEST_F(InvertedIndexFileWriterTest, OpenWithoutRamDirTest) {
     ASSERT_TRUE(writer._indices_dirs.find(key)->second.get() == dir.get());
 }
 
-TEST_F(InvertedIndexFileWriterTest, OpenWithRamDirTest) {
+TEST_F(IndexFileWriterTest, OpenWithRamDirTest) {
     // This test verifies the behavior when _can_use_ram_dir is set to true
     // Note: In a test environment, whether a RAM directory is actually used depends on
     // various factors like available memory, file size, etc.
     config::inverted_index_ram_dir_enable_when_base_compaction = true;
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2, nullptr, true);
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2, nullptr, true);
 
     int64_t index_id = 1;
     std::string index_suffix = "suffix_with_ram";
@@ -200,9 +200,9 @@ TEST_F(InvertedIndexFileWriterTest, OpenWithRamDirTest) {
     ASSERT_TRUE(writer._indices_dirs.find(key)->second.get() == dir.get());
 }
 
-TEST_F(InvertedIndexFileWriterTest, DeleteIndexTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+TEST_F(IndexFileWriterTest, DeleteIndexTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     InvertedIndexDirectoryMap indices_dirs;
     int64_t index_id = 1;
@@ -228,9 +228,9 @@ TEST_F(InvertedIndexFileWriterTest, DeleteIndexTest) {
     ASSERT_TRUE(del_nonexist_status.ok());
 }
 
-TEST_F(InvertedIndexFileWriterTest, WriteV1Test) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V1);
+TEST_F(IndexFileWriterTest, WriteV1Test) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V1);
 
     int64_t index_id = 1;
     std::string index_suffix = "suffix1";
@@ -262,14 +262,14 @@ TEST_F(InvertedIndexFileWriterTest, WriteV1Test) {
     std::cout << "total_size:" << total_size << std::endl;
 }
 
-TEST_F(InvertedIndexFileWriterTest, WriteV2Test) {
+TEST_F(IndexFileWriterTest, WriteV2Test) {
     io::FileWriterPtr file_writer;
     std::string index_path = InvertedIndexDescriptor::get_index_file_path_v2(_index_path_prefix);
     io::FileWriterOptions opts;
     Status st = _fs->create_file(index_path, &file_writer, &opts);
     ASSERT_TRUE(st.ok());
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2, std::move(file_writer));
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 
     int64_t index_id_1 = 1;
     std::string index_suffix_1 = "suffix1";
@@ -308,7 +308,7 @@ TEST_F(InvertedIndexFileWriterTest, WriteV2Test) {
     std::cout << "total_size:" << total_size << std::endl;
 }
 
-TEST_F(InvertedIndexFileWriterTest, HeaderLengthTest) {
+TEST_F(IndexFileWriterTest, HeaderLengthTest) {
     InvertedIndexDirectoryMap indices_dirs;
     auto mock_dir1 = std::make_shared<DorisFSDirectory>();
     auto mock_dir2 = std::make_shared<DorisFSDirectory>();
@@ -338,8 +338,7 @@ TEST_F(InvertedIndexFileWriterTest, HeaderLengthTest) {
         out_file_2->writeString("test2");
         out_file_2->close();
     }
-    auto insertDirectory = [&](InvertedIndexFileWriter& writer, int64_t index_id,
-                               const std::string& suffix,
+    auto insertDirectory = [&](IndexFileWriter& writer, int64_t index_id, const std::string& suffix,
                                std::shared_ptr<DorisFSDirectory>& mock_dir) {
         Status st = writer._insert_directory_into_map(index_id, suffix, mock_dir);
         if (!st.ok()) {
@@ -350,8 +349,8 @@ TEST_F(InvertedIndexFileWriterTest, HeaderLengthTest) {
         }
     };
 
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
     insertDirectory(writer, 1, "suffix1", mock_dir1);
     insertDirectory(writer, 2, "suffix2", mock_dir2);
 
@@ -381,7 +380,7 @@ TEST_F(InvertedIndexFileWriterTest, HeaderLengthTest) {
     ASSERT_EQ(header_length, expected_header_length);
 }
 
-TEST_F(InvertedIndexFileWriterTest, PrepareSortedFilesTest) {
+TEST_F(IndexFileWriterTest, PrepareSortedFilesTest) {
     auto mock_dir = std::make_shared<MockDorisFSDirectoryFileLength>();
     std::string local_fs_index_path = InvertedIndexDescriptor::get_temporary_index_path(
             ExecEnv::GetInstance()->get_tmp_file_dirs()->get_tmp_file_dir().native(), _rowset_id,
@@ -407,8 +406,8 @@ TEST_F(InvertedIndexFileWriterTest, PrepareSortedFilesTest) {
     EXPECT_CALL(*mock_dir, fileLength(testing::StrEq("null_bitmap")))
             .WillOnce(testing::Return(500));
 
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
     auto st = writer._insert_directory_into_map(1, "suffix1", mock_dir);
     if (!st.ok()) {
         std::cerr << "_insert_directory_into_map error in PrepareSortedFilesTest: " << st.msg()
@@ -446,7 +445,7 @@ TEST_F(InvertedIndexFileWriterTest, PrepareSortedFilesTest) {
     }
 }
 
-TEST_F(InvertedIndexFileWriterTest, PrepareFileMetadataTest) {
+TEST_F(IndexFileWriterTest, PrepareFileMetadataTest) {
     auto mock_dir = std::make_shared<MockDorisFSDirectoryFileLength>();
     std::string local_fs_index_path = InvertedIndexDescriptor::get_temporary_index_path(
             ExecEnv::GetInstance()->get_tmp_file_dirs()->get_tmp_file_dir().native(), _rowset_id,
@@ -476,8 +475,8 @@ TEST_F(InvertedIndexFileWriterTest, PrepareFileMetadataTest) {
     EXPECT_CALL(*mock_dir, fileLength(testing::StrEq("1.fnm"))).WillOnce(testing::Return(2500));
     EXPECT_CALL(*mock_dir, fileLength(testing::StrEq("1.tii"))).WillOnce(testing::Return(2200));
 
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
     auto st = writer._insert_directory_into_map(1, "suffix1", mock_dir);
     if (!st.ok()) {
         std::cerr << "_insert_directory_into_map error in PrepareFileMetadataTest: " << st.msg()
@@ -488,7 +487,7 @@ TEST_F(InvertedIndexFileWriterTest, PrepareFileMetadataTest) {
 
     int64_t current_offset = 0;
 
-    std::vector<InvertedIndexFileWriter::FileMetadata> file_metadata =
+    std::vector<IndexFileWriter::FileMetadata> file_metadata =
             writer.prepare_file_metadata(current_offset);
 
     ASSERT_EQ(file_metadata.size(), 7); // Adjusted size after adding new files
@@ -527,7 +526,7 @@ TEST_F(InvertedIndexFileWriterTest, PrepareFileMetadataTest) {
     }
 }
 
-/*TEST_F(InvertedIndexFileWriterTest, CopyFileTest_OpenInputFailure) {
+/*TEST_F(IndexFileWriterTest, CopyFileTest_OpenInputFailure) {
     auto mock_dir = std::make_shared<MockDorisFSDirectoryOpenInput>();
     std::string local_fs_index_path = InvertedIndexDescriptor::get_temporary_index_path(
             ExecEnv::GetInstance()->get_tmp_file_dirs()->get_tmp_file_dir().native(), _rowset_id,
@@ -542,7 +541,7 @@ TEST_F(InvertedIndexFileWriterTest, PrepareFileMetadataTest) {
         out_file_1->writeString("test1");
         out_file_1->close();
     }
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
                                    InvertedIndexStorageFormatPB::V2);
     auto st = writer._insert_directory_into_map(1, "suffix1", mock_dir);
     if (!st.ok()) {
@@ -569,22 +568,21 @@ TEST_F(InvertedIndexFileWriterTest, PrepareFileMetadataTest) {
     }
     ASSERT_EQ(error_message, "Could not open file, file is 0.segments");
 }*/
-class InvertedIndexFileWriterMock : public InvertedIndexFileWriter {
+class IndexFileWriterMock : public IndexFileWriter {
 public:
-    InvertedIndexFileWriterMock(const io::FileSystemSPtr& fs, const std::string& index_path_prefix,
-                                const std::string& rowset_id, int32_t segment_id,
-                                InvertedIndexStorageFormatPB storage_format)
-            : InvertedIndexFileWriter(fs, index_path_prefix, rowset_id, segment_id,
-                                      storage_format) {}
+    IndexFileWriterMock(const io::FileSystemSPtr& fs, const std::string& index_path_prefix,
+                        const std::string& rowset_id, int32_t segment_id,
+                        InvertedIndexStorageFormatPB storage_format)
+            : IndexFileWriter(fs, index_path_prefix, rowset_id, segment_id, storage_format) {}
 
     MOCK_METHOD(void, write_header_and_data_v1,
                 (lucene::store::IndexOutput * output, const std::vector<FileInfo>& files,
                  lucene::store::Directory* dir, int64_t header_length, int32_t file_count),
                 (override));
 };
-TEST_F(InvertedIndexFileWriterTest, WriteV1ExceptionHandlingTest) {
-    InvertedIndexFileWriterMock writer_mock(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                            InvertedIndexStorageFormatPB::V1);
+TEST_F(IndexFileWriterTest, WriteV1ExceptionHandlingTest) {
+    IndexFileWriterMock writer_mock(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                                    InvertedIndexStorageFormatPB::V1);
 
     int64_t index_id = 1;
     std::string index_suffix = "suffix1";
@@ -607,15 +605,14 @@ TEST_F(InvertedIndexFileWriterTest, WriteV1ExceptionHandlingTest) {
     ASSERT_FALSE(status.ok());
     ASSERT_EQ(status.code(), ErrorCode::INVERTED_INDEX_CLUCENE_ERROR);
 }
-class InvertedIndexFileWriterMockV2 : public InvertedIndexFileWriter {
+class IndexFileWriterMockV2 : public IndexFileWriter {
 public:
-    InvertedIndexFileWriterMockV2(const io::FileSystemSPtr& fs,
-                                  const std::string& index_path_prefix,
-                                  const std::string& rowset_id, int32_t segment_id,
-                                  InvertedIndexStorageFormatPB storage_format,
-                                  io::FileWriterPtr file_writer)
-            : InvertedIndexFileWriter(fs, index_path_prefix, rowset_id, segment_id, storage_format,
-                                      std::move(file_writer)) {}
+    IndexFileWriterMockV2(const io::FileSystemSPtr& fs, const std::string& index_path_prefix,
+                          const std::string& rowset_id, int32_t segment_id,
+                          InvertedIndexStorageFormatPB storage_format,
+                          io::FileWriterPtr file_writer)
+            : IndexFileWriter(fs, index_path_prefix, rowset_id, segment_id, storage_format,
+                              std::move(file_writer)) {}
 
     MOCK_METHOD(void, write_index_headers_and_metadata,
                 (lucene::store::IndexOutput * compound_file_output,
@@ -623,15 +620,14 @@ public:
                 (override));
 };
 
-TEST_F(InvertedIndexFileWriterTest, WriteV2ExceptionHandlingTest) {
+TEST_F(IndexFileWriterTest, WriteV2ExceptionHandlingTest) {
     io::FileWriterPtr file_writer;
     std::string index_path = InvertedIndexDescriptor::get_index_file_path_v2(_index_path_prefix);
     io::FileWriterOptions opts;
     Status st = _fs->create_file(index_path, &file_writer, &opts);
     ASSERT_TRUE(st.ok());
-    InvertedIndexFileWriterMockV2 writer_mock(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                              InvertedIndexStorageFormatPB::V2,
-                                              std::move(file_writer));
+    IndexFileWriterMockV2 writer_mock(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                                      InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 
     int64_t index_id = 1;
     std::string index_suffix = "suffix1";
@@ -655,30 +651,26 @@ TEST_F(InvertedIndexFileWriterTest, WriteV2ExceptionHandlingTest) {
     ASSERT_EQ(status.code(), ErrorCode::INVERTED_INDEX_CLUCENE_ERROR);
 }
 
-class InvertedIndexFileWriterMockCreateOutputStreamV2 : public InvertedIndexFileWriter {
+class IndexFileWriterMockCreateOutputStreamV2 : public IndexFileWriter {
 public:
-    InvertedIndexFileWriterMockCreateOutputStreamV2(const io::FileSystemSPtr& fs,
-                                                    const std::string& index_path_prefix,
-                                                    const std::string& rowset_id,
-                                                    int32_t segment_id,
-                                                    InvertedIndexStorageFormatPB storage_format)
-            : InvertedIndexFileWriter(fs, index_path_prefix, rowset_id, segment_id,
-                                      storage_format) {}
+    IndexFileWriterMockCreateOutputStreamV2(const io::FileSystemSPtr& fs,
+                                            const std::string& index_path_prefix,
+                                            const std::string& rowset_id, int32_t segment_id,
+                                            InvertedIndexStorageFormatPB storage_format)
+            : IndexFileWriter(fs, index_path_prefix, rowset_id, segment_id, storage_format) {}
 
     MOCK_METHOD((std::pair<std::unique_ptr<lucene::store::Directory, DirectoryDeleter>,
                            std::unique_ptr<lucene::store::IndexOutput>>),
                 create_output_stream, (), (override));
 };
 
-class InvertedIndexFileWriterMockCreateOutputStreamV1 : public InvertedIndexFileWriter {
+class IndexFileWriterMockCreateOutputStreamV1 : public IndexFileWriter {
 public:
-    InvertedIndexFileWriterMockCreateOutputStreamV1(const io::FileSystemSPtr& fs,
-                                                    const std::string& index_path_prefix,
-                                                    const std::string& rowset_id,
-                                                    int32_t segment_id,
-                                                    InvertedIndexStorageFormatPB storage_format)
-            : InvertedIndexFileWriter(fs, index_path_prefix, rowset_id, segment_id,
-                                      storage_format) {}
+    IndexFileWriterMockCreateOutputStreamV1(const io::FileSystemSPtr& fs,
+                                            const std::string& index_path_prefix,
+                                            const std::string& rowset_id, int32_t segment_id,
+                                            InvertedIndexStorageFormatPB storage_format)
+            : IndexFileWriter(fs, index_path_prefix, rowset_id, segment_id, storage_format) {}
 
     MOCK_METHOD((std::pair<std::unique_ptr<lucene::store::Directory, DirectoryDeleter>,
                            std::unique_ptr<lucene::store::IndexOutput>>),
@@ -706,11 +698,11 @@ public:
     MOCK_METHOD(void, flushBuffer, (const uint8_t* b, const int32_t size), (override));
 };
 
-TEST_F(InvertedIndexFileWriterTest, WriteV1OutputTest) {
+TEST_F(IndexFileWriterTest, WriteV1OutputTest) {
     int64_t index_id = 1;
     std::string index_suffix = "suffix1";
-    InvertedIndexFileWriterMockCreateOutputStreamV1 writer_mock(
-            _fs, _index_path_prefix, _rowset_id, _seg_id, InvertedIndexStorageFormatPB::V1);
+    IndexFileWriterMockCreateOutputStreamV1 writer_mock(_fs, _index_path_prefix, _rowset_id,
+                                                        _seg_id, InvertedIndexStorageFormatPB::V1);
     io::Path cfs_path(InvertedIndexDescriptor::get_index_file_path_v1(_index_path_prefix, index_id,
                                                                       index_suffix));
     auto idx_path = cfs_path.parent_path();
@@ -749,15 +741,15 @@ TEST_F(InvertedIndexFileWriterTest, WriteV1OutputTest) {
     ASSERT_EQ(status.code(), ErrorCode::INVERTED_INDEX_CLUCENE_ERROR);
 }
 
-TEST_F(InvertedIndexFileWriterTest, WriteV2OutputTest) {
+TEST_F(IndexFileWriterTest, WriteV2OutputTest) {
     io::FileWriterPtr file_writer;
     std::string index_path = InvertedIndexDescriptor::get_index_file_path_v2(_index_path_prefix);
     io::FileWriterOptions opts;
     Status st = _fs->create_file(index_path, &file_writer, &opts);
     ASSERT_TRUE(st.ok());
 
-    InvertedIndexFileWriterMockCreateOutputStreamV2 writer_mock(
-            _fs, _index_path_prefix, _rowset_id, _seg_id, InvertedIndexStorageFormatPB::V2);
+    IndexFileWriterMockCreateOutputStreamV2 writer_mock(_fs, _index_path_prefix, _rowset_id,
+                                                        _seg_id, InvertedIndexStorageFormatPB::V2);
     auto* out_dir = DorisFSDirectoryFactory::getDirectory(_fs, index_path.c_str());
     std::unique_ptr<lucene::store::Directory, DirectoryDeleter> out_dir_ptr(out_dir);
     auto* mock_output_v2 = new MockFSIndexOutputV2();
@@ -805,15 +797,15 @@ public:
     void base_close() { DorisFSDirectory::FSIndexOutput::BufferedIndexOutput::close(); }
 };
 
-TEST_F(InvertedIndexFileWriterTest, WriteV2OutputCloseErrorTest) {
+TEST_F(IndexFileWriterTest, WriteV2OutputCloseErrorTest) {
     io::FileWriterPtr file_writer;
     std::string index_path = InvertedIndexDescriptor::get_index_file_path_v2(_index_path_prefix);
     io::FileWriterOptions opts;
     Status st = _fs->create_file(index_path, &file_writer, &opts);
     ASSERT_TRUE(st.ok());
 
-    InvertedIndexFileWriterMockCreateOutputStreamV2 writer_mock(
-            _fs, _index_path_prefix, _rowset_id, _seg_id, InvertedIndexStorageFormatPB::V2);
+    IndexFileWriterMockCreateOutputStreamV2 writer_mock(_fs, _index_path_prefix, _rowset_id,
+                                                        _seg_id, InvertedIndexStorageFormatPB::V2);
     auto* out_dir = DorisFSDirectoryFactory::getDirectory(_fs, index_path.c_str());
     std::unique_ptr<lucene::store::Directory, DirectoryDeleter> out_dir_ptr(out_dir);
     auto* mock_output_v2 = new MockFSIndexOutputCloseV2();
@@ -851,11 +843,11 @@ TEST_F(InvertedIndexFileWriterTest, WriteV2OutputCloseErrorTest) {
     ASSERT_EQ(status.code(), ErrorCode::INVERTED_INDEX_CLUCENE_ERROR);
 }
 
-TEST_F(InvertedIndexFileWriterTest, WriteV1OutputCloseErrorTest) {
+TEST_F(IndexFileWriterTest, WriteV1OutputCloseErrorTest) {
     int64_t index_id = 1;
     std::string index_suffix = "suffix1";
-    InvertedIndexFileWriterMockCreateOutputStreamV1 writer_mock(
-            _fs, _index_path_prefix, _rowset_id, _seg_id, InvertedIndexStorageFormatPB::V1);
+    IndexFileWriterMockCreateOutputStreamV1 writer_mock(_fs, _index_path_prefix, _rowset_id,
+                                                        _seg_id, InvertedIndexStorageFormatPB::V1);
     io::Path cfs_path(InvertedIndexDescriptor::get_index_file_path_v1(_index_path_prefix, index_id,
                                                                       index_suffix));
     auto idx_path = cfs_path.parent_path();
@@ -896,16 +888,15 @@ TEST_F(InvertedIndexFileWriterTest, WriteV1OutputCloseErrorTest) {
     ASSERT_EQ(status.code(), ErrorCode::INVERTED_INDEX_CLUCENE_ERROR);
 }
 
-class MockInvertedIndexFileWriter : public InvertedIndexFileWriter {
+class MockIndexFileWriter : public IndexFileWriter {
 public:
     MOCK_METHOD(Result<std::unique_ptr<IndexSearcherBuilder>>, _construct_index_searcher_builder,
                 (const DorisCompoundReader* dir), (override));
-    MockInvertedIndexFileWriter(io::FileSystemSPtr fs, const std::string& index_path_prefix,
-                                const std::string& rowset_id, int64_t seg_id,
-                                InvertedIndexStorageFormatPB storage_format,
-                                io::FileWriterPtr file_writer)
-            : InvertedIndexFileWriter(fs, index_path_prefix, rowset_id, seg_id, storage_format,
-                                      std::move(file_writer)) {}
+    MockIndexFileWriter(io::FileSystemSPtr fs, const std::string& index_path_prefix,
+                        const std::string& rowset_id, int64_t seg_id,
+                        InvertedIndexStorageFormatPB storage_format, io::FileWriterPtr file_writer)
+            : IndexFileWriter(fs, index_path_prefix, rowset_id, seg_id, storage_format,
+                              std::move(file_writer)) {}
 };
 
 class MockIndexSearcherBuilder : public IndexSearcherBuilder {
@@ -919,15 +910,15 @@ public:
     ~MockIndexSearcherBuilder() override = default;
 };
 
-TEST_F(InvertedIndexFileWriterTest, AddIntoSearcherCacheTest) {
+TEST_F(IndexFileWriterTest, AddIntoSearcherCacheTest) {
     config::enable_write_index_searcher_cache = true;
     io::FileWriterPtr file_writer;
     std::string index_path = InvertedIndexDescriptor::get_index_file_path_v2(_index_path_prefix);
     io::FileWriterOptions opts;
     Status st = _fs->create_file(index_path, &file_writer, &opts);
     ASSERT_TRUE(st.ok());
-    MockInvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                       InvertedIndexStorageFormatPB::V2, std::move(file_writer));
+    MockIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                               InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 
     int64_t index_id = 1;
     std::string index_suffix = "suffix1";
@@ -972,7 +963,7 @@ TEST_F(InvertedIndexFileWriterTest, AddIntoSearcherCacheTest) {
     config::enable_write_index_searcher_cache = false;
 }
 
-TEST_F(InvertedIndexFileWriterTest, CacheEvictionTest) {
+TEST_F(IndexFileWriterTest, CacheEvictionTest) {
     config::enable_write_index_searcher_cache = true;
     io::FileWriterPtr file_writer1, file_writer2, file_writer3;
     std::string index_path1 =
@@ -988,8 +979,8 @@ TEST_F(InvertedIndexFileWriterTest, CacheEvictionTest) {
     ASSERT_TRUE(st1.ok());
     ASSERT_TRUE(st2.ok());
     ASSERT_TRUE(st3.ok());
-    MockInvertedIndexFileWriter writer1(_fs, _index_path_prefix + "_1", "rowset1", 1,
-                                        InvertedIndexStorageFormatPB::V2, std::move(file_writer1));
+    MockIndexFileWriter writer1(_fs, _index_path_prefix + "_1", "rowset1", 1,
+                                InvertedIndexStorageFormatPB::V2, std::move(file_writer1));
     int64_t index_id1 = 1;
     std::string index_suffix1 = "suffix1";
     auto index_meta1 = create_mock_tablet_index(index_id1, index_suffix1);
@@ -1020,8 +1011,8 @@ TEST_F(InvertedIndexFileWriterTest, CacheEvictionTest) {
     Status close_status1 = writer1.close();
     ASSERT_TRUE(close_status1.ok());
 
-    MockInvertedIndexFileWriter writer2(_fs, _index_path_prefix + "_2", "rowset2", 2,
-                                        InvertedIndexStorageFormatPB::V2, std::move(file_writer2));
+    MockIndexFileWriter writer2(_fs, _index_path_prefix + "_2", "rowset2", 2,
+                                InvertedIndexStorageFormatPB::V2, std::move(file_writer2));
     int64_t index_id2 = 2;
     std::string index_suffix2 = "suffix2";
     auto index_meta2 = create_mock_tablet_index(index_id2, index_suffix2);
@@ -1052,8 +1043,8 @@ TEST_F(InvertedIndexFileWriterTest, CacheEvictionTest) {
     Status close_status2 = writer2.close();
     ASSERT_TRUE(close_status2.ok());
 
-    MockInvertedIndexFileWriter writer3(_fs, _index_path_prefix + "_3", "rowset3", 3,
-                                        InvertedIndexStorageFormatPB::V2, std::move(file_writer3));
+    MockIndexFileWriter writer3(_fs, _index_path_prefix + "_3", "rowset3", 3,
+                                InvertedIndexStorageFormatPB::V2, std::move(file_writer3));
     int64_t index_id3 = 3;
     std::string index_suffix3 = "suffix3";
     auto index_meta3 = create_mock_tablet_index(index_id3, index_suffix3);
@@ -1113,7 +1104,7 @@ TEST_F(InvertedIndexFileWriterTest, CacheEvictionTest) {
     config::enable_write_index_searcher_cache = false;
 }
 
-TEST_F(InvertedIndexFileWriterTest, CacheUpdateTest) {
+TEST_F(IndexFileWriterTest, CacheUpdateTest) {
     config::enable_write_index_searcher_cache = true;
     io::FileWriterPtr file_writer;
     std::string index_path =
@@ -1121,8 +1112,8 @@ TEST_F(InvertedIndexFileWriterTest, CacheUpdateTest) {
     io::FileWriterOptions opts;
     Status st = _fs->create_file(index_path, &file_writer, &opts);
     ASSERT_TRUE(st.ok());
-    MockInvertedIndexFileWriter writer(_fs, _index_path_prefix + "_update", "rowset_update", 3,
-                                       InvertedIndexStorageFormatPB::V2, std::move(file_writer));
+    MockIndexFileWriter writer(_fs, _index_path_prefix + "_update", "rowset_update", 3,
+                               InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 
     int64_t index_id = 3;
     std::string index_suffix = "suffix3";
@@ -1164,9 +1155,8 @@ TEST_F(InvertedIndexFileWriterTest, CacheUpdateTest) {
     io::FileWriterPtr file_writer_new;
     Status st_new = _fs->create_file(index_path, &file_writer_new, &opts);
     ASSERT_TRUE(st_new.ok());
-    MockInvertedIndexFileWriter writer_new(_fs, _index_path_prefix + "_update", "rowset_update", 3,
-                                           InvertedIndexStorageFormatPB::V2,
-                                           std::move(file_writer_new));
+    MockIndexFileWriter writer_new(_fs, _index_path_prefix + "_update", "rowset_update", 3,
+                                   InvertedIndexStorageFormatPB::V2, std::move(file_writer_new));
 
     auto open_result_new = writer_new.open(index_meta.get());
     ASSERT_TRUE(open_result_new.has_value());
@@ -1203,7 +1193,7 @@ TEST_F(InvertedIndexFileWriterTest, CacheUpdateTest) {
     config::enable_write_index_searcher_cache = false;
 }
 
-TEST_F(InvertedIndexFileWriterTest, AddIntoSearcherCacheV1Test) {
+TEST_F(IndexFileWriterTest, AddIntoSearcherCacheV1Test) {
     config::enable_write_index_searcher_cache = true;
     io::FileWriterPtr file_writer;
     std::string index_suffix = "suffix_v1";
@@ -1212,8 +1202,8 @@ TEST_F(InvertedIndexFileWriterTest, AddIntoSearcherCacheV1Test) {
     io::FileWriterOptions opts;
     Status st = _fs->create_file(index_path, &file_writer, &opts);
     ASSERT_TRUE(st.ok());
-    MockInvertedIndexFileWriter writer(_fs, _index_path_prefix + "_v1", "rowset_v1", 4,
-                                       InvertedIndexStorageFormatPB::V1, std::move(file_writer));
+    MockIndexFileWriter writer(_fs, _index_path_prefix + "_v1", "rowset_v1", 4,
+                               InvertedIndexStorageFormatPB::V1, std::move(file_writer));
     int64_t index_id = 4;
     auto index_meta = create_mock_tablet_index(index_id, index_suffix);
     ASSERT_NE(index_meta, nullptr);
@@ -1306,7 +1296,7 @@ private:
 };
 
 // Test case for rowset writer's create_inverted_index_file_writer with RAM directory disabled
-TEST_F(InvertedIndexFileWriterTest, RowsetWriterCreateInvertedIndexFileWriterWithoutRamDir) {
+TEST_F(IndexFileWriterTest, RowsetWriterCreateIndexFileWriterWithoutRamDir) {
     // Set config flag to disable RAM directory
     config::inverted_index_ram_dir_enable_when_base_compaction = false;
 
@@ -1325,7 +1315,7 @@ TEST_F(InvertedIndexFileWriterTest, RowsetWriterCreateInvertedIndexFileWriterWit
                             ReaderType::READER_BASE_COMPACTION);
 
     uint32_t segment_id = 1;
-    InvertedIndexFileWriterPtr index_file_writer;
+    IndexFileWriterPtr index_file_writer;
 
     // Call the method to test
     Status status = writer.create_inverted_index_file_writer(segment_id, &index_file_writer);
@@ -1355,7 +1345,7 @@ TEST_F(InvertedIndexFileWriterTest, RowsetWriterCreateInvertedIndexFileWriterWit
 }
 
 // Test case for rowset writer's create_inverted_index_file_writer with RAM directory enabled
-TEST_F(InvertedIndexFileWriterTest, RowsetWriterCreateInvertedIndexFileWriterWithRamDir) {
+TEST_F(IndexFileWriterTest, RowsetWriterCreateIndexFileWriterWithRamDir) {
     // Set config flag to enable RAM directory
     config::inverted_index_ram_dir_enable_when_base_compaction = true;
 
@@ -1374,7 +1364,7 @@ TEST_F(InvertedIndexFileWriterTest, RowsetWriterCreateInvertedIndexFileWriterWit
                             ReaderType::READER_BASE_COMPACTION);
 
     uint32_t segment_id = 1;
-    InvertedIndexFileWriterPtr index_file_writer;
+    IndexFileWriterPtr index_file_writer;
 
     // Call the method to test
     Status status = writer.create_inverted_index_file_writer(segment_id, &index_file_writer);
@@ -1404,7 +1394,7 @@ TEST_F(InvertedIndexFileWriterTest, RowsetWriterCreateInvertedIndexFileWriterWit
 }
 
 // Test case for rowset writer's create_inverted_index_file_writer with non-base compaction (should always use RAM)
-TEST_F(InvertedIndexFileWriterTest, RowsetWriterCreateInvertedIndexFileWriterNonBaseCompaction) {
+TEST_F(IndexFileWriterTest, RowsetWriterCreateIndexFileWriterNonBaseCompaction) {
     // Set config flag to disable RAM directory for base compaction
     config::inverted_index_ram_dir_enable_when_base_compaction = false;
 
@@ -1423,7 +1413,7 @@ TEST_F(InvertedIndexFileWriterTest, RowsetWriterCreateInvertedIndexFileWriterNon
                             ReaderType::READER_QUERY); // Not base compaction
 
     uint32_t segment_id = 1;
-    InvertedIndexFileWriterPtr index_file_writer;
+    IndexFileWriterPtr index_file_writer;
 
     // Call the method to test
     Status status = writer.create_inverted_index_file_writer(segment_id, &index_file_writer);
@@ -1453,10 +1443,10 @@ TEST_F(InvertedIndexFileWriterTest, RowsetWriterCreateInvertedIndexFileWriterNon
 }
 
 // Test case for multiple indices with exception in create_output_stream_v1
-TEST_F(InvertedIndexFileWriterTest, MultipleIndicesCreateOutputStreamException) {
+TEST_F(IndexFileWriterTest, MultipleIndicesCreateOutputStreamException) {
     // Setup writer mock
-    InvertedIndexFileWriterMockCreateOutputStreamV1 writer_mock(
-            _fs, _index_path_prefix, _rowset_id, _seg_id, InvertedIndexStorageFormatPB::V1);
+    IndexFileWriterMockCreateOutputStreamV1 writer_mock(_fs, _index_path_prefix, _rowset_id,
+                                                        _seg_id, InvertedIndexStorageFormatPB::V1);
 
     // First index setup - index_id=1
     int64_t index_id_1 = 1;
@@ -1525,7 +1515,7 @@ TEST_F(InvertedIndexFileWriterTest, MultipleIndicesCreateOutputStreamException) 
     ASSERT_EQ(status.code(), ErrorCode::INVERTED_INDEX_CLUCENE_ERROR);
 }
 
-TEST_F(InvertedIndexFileWriterTest, CopyFileEmptyFileTest) {
+TEST_F(IndexFileWriterTest, CopyFileEmptyFileTest) {
     // This test uses the existing MockDorisFSDirectoryOpenInput class
     auto mock_dir = std::make_shared<MockDorisFSDirectoryOpenInput>();
     std::string local_fs_index_path = InvertedIndexDescriptor::get_temporary_index_path(
@@ -1544,8 +1534,8 @@ TEST_F(InvertedIndexFileWriterTest, CopyFileEmptyFileTest) {
         out_file->close();
     }
 
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     // Setup mock to simulate CL_ERR_EmptyIndexSegment error for _0.frq file
     EXPECT_CALL(*mock_dir,
@@ -1582,9 +1572,9 @@ TEST_F(InvertedIndexFileWriterTest, CopyFileEmptyFileTest) {
 }
 
 // Test for duplicate key insertion error handling in _insert_directory_into_map
-TEST_F(InvertedIndexFileWriterTest, InsertDirectoryDuplicateKeyTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+TEST_F(IndexFileWriterTest, InsertDirectoryDuplicateKeyTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     // First insertion should succeed
     int64_t index_id = 1;
@@ -1602,9 +1592,9 @@ TEST_F(InvertedIndexFileWriterTest, InsertDirectoryDuplicateKeyTest) {
 }
 
 // Test for delete_index with null index_meta
-TEST_F(InvertedIndexFileWriterTest, DeleteIndexNullMetaTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+TEST_F(IndexFileWriterTest, DeleteIndexNullMetaTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     // Test with null pointer - should handle gracefully
     Status status = writer.delete_index(nullptr);
@@ -1614,9 +1604,9 @@ TEST_F(InvertedIndexFileWriterTest, DeleteIndexNullMetaTest) {
 }
 
 // Test for add_into_searcher_cache with StreamSinkFileWriter nullptr check
-TEST_F(InvertedIndexFileWriterTest, AddIntoSearcherCacheStreamSinkNullTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+TEST_F(IndexFileWriterTest, AddIntoSearcherCacheStreamSinkNullTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     // Create a directory for testing
     int64_t index_id = 1;
@@ -1634,7 +1624,7 @@ TEST_F(InvertedIndexFileWriterTest, AddIntoSearcherCacheStreamSinkNullTest) {
 }
 
 // Test copyFile with various exception scenarios
-TEST_F(InvertedIndexFileWriterTest, CopyFileExceptionHandlingTest) {
+TEST_F(IndexFileWriterTest, CopyFileExceptionHandlingTest) {
     auto mock_dir = std::make_shared<MockDorisFSDirectoryOpenInput>();
     std::string local_fs_index_path = InvertedIndexDescriptor::get_temporary_index_path(
             ExecEnv::GetInstance()->get_tmp_file_dirs()->get_tmp_file_dir().native(), _rowset_id,
@@ -1649,8 +1639,8 @@ TEST_F(InvertedIndexFileWriterTest, CopyFileExceptionHandlingTest) {
     out_file->writeString("test");
     out_file->close();
 
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     uint8_t buffer[16384];
     auto* ram_dir = new lucene::store::RAMDirectory();
@@ -1684,9 +1674,9 @@ TEST_F(InvertedIndexFileWriterTest, CopyFileExceptionHandlingTest) {
 }
 
 // Test for calculate_header_length with empty files
-TEST_F(InvertedIndexFileWriterTest, CalculateHeaderLengthEmptyFilesTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+TEST_F(IndexFileWriterTest, CalculateHeaderLengthEmptyFilesTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     // Create a directory with no files to test the empty files scenario
     std::string local_fs_index_path = InvertedIndexDescriptor::get_temporary_index_path(
@@ -1708,9 +1698,9 @@ TEST_F(InvertedIndexFileWriterTest, CalculateHeaderLengthEmptyFilesTest) {
 }
 
 // Test for create_output_stream_v1 basic functionality
-TEST_F(InvertedIndexFileWriterTest, CreateOutputStreamV1BasicTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V1);
+TEST_F(IndexFileWriterTest, CreateOutputStreamV1BasicTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V1);
 
     int64_t index_id = 1;
     std::string index_suffix = "test_suffix";
@@ -1728,9 +1718,9 @@ TEST_F(InvertedIndexFileWriterTest, CreateOutputStreamV1BasicTest) {
 }
 
 // Test write_header_and_data_v1 with various file scenarios
-TEST_F(InvertedIndexFileWriterTest, WriteHeaderAndDataV1EdgeCasesTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V1);
+TEST_F(IndexFileWriterTest, WriteHeaderAndDataV1EdgeCasesTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V1);
 
     // Create test directory and files
     std::string local_fs_index_path = InvertedIndexDescriptor::get_temporary_index_path(
@@ -1779,9 +1769,9 @@ TEST_F(InvertedIndexFileWriterTest, WriteHeaderAndDataV1EdgeCasesTest) {
 }
 
 // Test for directory deletion in close() function when using V1 format
-TEST_F(InvertedIndexFileWriterTest, CloseV1DirectoryDeletionTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V1);
+TEST_F(IndexFileWriterTest, CloseV1DirectoryDeletionTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V1);
 
     int64_t index_id = 1;
     std::string index_suffix = "suffix1";
@@ -1805,15 +1795,15 @@ TEST_F(InvertedIndexFileWriterTest, CloseV1DirectoryDeletionTest) {
 }
 
 // Test for CLucene exception handling in close() function for V2 format
-TEST_F(InvertedIndexFileWriterTest, CloseV2CLuceneExceptionTest) {
+TEST_F(IndexFileWriterTest, CloseV2CLuceneExceptionTest) {
     io::FileWriterPtr file_writer;
     std::string index_path = InvertedIndexDescriptor::get_index_file_path_v2(_index_path_prefix);
     io::FileWriterOptions opts;
     Status st = _fs->create_file(index_path, &file_writer, &opts);
     ASSERT_TRUE(st.ok());
 
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2, std::move(file_writer));
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 
     int64_t index_id = 1;
     std::string index_suffix = "suffix1";
@@ -1837,15 +1827,15 @@ TEST_F(InvertedIndexFileWriterTest, CloseV2CLuceneExceptionTest) {
 }
 
 // Test for compound directory deletion error handling
-TEST_F(InvertedIndexFileWriterTest, CompoundDirectoryDeletionTest) {
+TEST_F(IndexFileWriterTest, CompoundDirectoryDeletionTest) {
     io::FileWriterPtr file_writer;
     std::string index_path = InvertedIndexDescriptor::get_index_file_path_v2(_index_path_prefix);
     io::FileWriterOptions opts;
     Status st = _fs->create_file(index_path, &file_writer, &opts);
     ASSERT_TRUE(st.ok());
 
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2, std::move(file_writer));
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 
     int64_t index_id = 1;
     std::string index_suffix = "suffix1";
@@ -1871,7 +1861,7 @@ TEST_F(InvertedIndexFileWriterTest, CompoundDirectoryDeletionTest) {
 }
 
 // Test for non-zero remainder handling in copyFile
-TEST_F(InvertedIndexFileWriterTest, CopyFileNonZeroRemainderTest) {
+TEST_F(IndexFileWriterTest, CopyFileNonZeroRemainderTest) {
     auto mock_dir = std::make_shared<DorisFSDirectory>();
     std::string local_fs_index_path = InvertedIndexDescriptor::get_temporary_index_path(
             ExecEnv::GetInstance()->get_tmp_file_dirs()->get_tmp_file_dir().native(), _rowset_id,
@@ -1887,8 +1877,8 @@ TEST_F(InvertedIndexFileWriterTest, CopyFileNonZeroRemainderTest) {
     out_file->writeBytes(reinterpret_cast<const uint8_t*>(test_data.c_str()), test_data.size());
     out_file->close();
 
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     uint8_t buffer[1024]; // Small buffer to ensure remainder
     auto* ram_dir = new lucene::store::RAMDirectory();
@@ -1908,12 +1898,12 @@ TEST_F(InvertedIndexFileWriterTest, CopyFileNonZeroRemainderTest) {
 }
 
 // Test for file offset mismatch error handling
-TEST_F(InvertedIndexFileWriterTest, FileOffsetMismatchTest) {
+TEST_F(IndexFileWriterTest, FileOffsetMismatchTest) {
     // This test is designed to trigger the diff != length error condition
     // This would typically happen if there's a problem with file copying or offset calculation
 
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     // Create a mock scenario where file offsets don't match expectations
     // This is more of an internal consistency check, so we mainly verify
@@ -1924,15 +1914,15 @@ TEST_F(InvertedIndexFileWriterTest, FileOffsetMismatchTest) {
 }
 
 // Test for write_index_headers_and_metadata coverage
-TEST_F(InvertedIndexFileWriterTest, WriteIndexHeadersAndMetadataTest) {
+TEST_F(IndexFileWriterTest, WriteIndexHeadersAndMetadataTest) {
     io::FileWriterPtr file_writer;
     std::string index_path = InvertedIndexDescriptor::get_index_file_path_v2(_index_path_prefix);
     io::FileWriterOptions opts;
     Status st = _fs->create_file(index_path, &file_writer, &opts);
     ASSERT_TRUE(st.ok());
 
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2, std::move(file_writer));
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 
     // Create test directory and files to trigger write_index_headers_and_metadata
     std::string local_fs_index_path = InvertedIndexDescriptor::get_temporary_index_path(
@@ -1966,9 +1956,9 @@ TEST_F(InvertedIndexFileWriterTest, WriteIndexHeadersAndMetadataTest) {
 }
 
 // Test for data_offset accumulation in write_header_and_data_v1
-TEST_F(InvertedIndexFileWriterTest, DataOffsetAccumulationTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V1);
+TEST_F(IndexFileWriterTest, DataOffsetAccumulationTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V1);
 
     // Create test directory and files
     std::string local_fs_index_path = InvertedIndexDescriptor::get_temporary_index_path(
@@ -2021,15 +2011,15 @@ TEST_F(InvertedIndexFileWriterTest, DataOffsetAccumulationTest) {
 }
 
 // Test for empty index scenario with V2 format
-TEST_F(InvertedIndexFileWriterTest, EmptyIndexV2Test) {
+TEST_F(IndexFileWriterTest, EmptyIndexV2Test) {
     io::FileWriterPtr file_writer;
     std::string index_path = InvertedIndexDescriptor::get_index_file_path_v2(_index_path_prefix);
     io::FileWriterOptions opts;
     Status st = _fs->create_file(index_path, &file_writer, &opts);
     ASSERT_TRUE(st.ok());
 
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2, std::move(file_writer));
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 
     // Close without adding any indices - should handle empty case
     Status close_status = writer.close();
@@ -2037,10 +2027,10 @@ TEST_F(InvertedIndexFileWriterTest, EmptyIndexV2Test) {
 }
 
 // Test for StreamSinkFileWriter path in close()
-TEST_F(InvertedIndexFileWriterTest, StreamSinkFileWriterCloseTest) {
+TEST_F(IndexFileWriterTest, StreamSinkFileWriterCloseTest) {
     // Create a writer without providing a file_writer to trigger the StreamSinkFileWriter path
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V2);
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V2);
 
     // Close should handle the case where _idx_v2_writer is not a StreamSinkFileWriter
     Status close_status = writer.close();
@@ -2048,9 +2038,9 @@ TEST_F(InvertedIndexFileWriterTest, StreamSinkFileWriterCloseTest) {
 }
 
 // Test for header file count in write_header_and_data_v1
-TEST_F(InvertedIndexFileWriterTest, HeaderFileCountTest) {
-    InvertedIndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
-                                   InvertedIndexStorageFormatPB::V1);
+TEST_F(IndexFileWriterTest, HeaderFileCountTest) {
+    IndexFileWriter writer(_fs, _index_path_prefix, _rowset_id, _seg_id,
+                           InvertedIndexStorageFormatPB::V1);
 
     // Create a scenario where header_file_count > i to test different file writing logic
     std::string local_fs_index_path = InvertedIndexDescriptor::get_temporary_index_path(

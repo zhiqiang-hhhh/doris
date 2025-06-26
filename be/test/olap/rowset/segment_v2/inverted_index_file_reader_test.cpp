@@ -15,8 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "olap/rowset/segment_v2/inverted_index_file_reader.h"
-
 #include <CLucene.h>
 #include <gtest/gtest.h>
 #include <unistd.h>
@@ -28,6 +26,7 @@
 #include "io/fs/local_file_system.h"
 #include "olap/data_dir.h"
 #include "olap/options.h"
+#include "olap/rowset/segment_v2/index_file_reader.h"
 #include "olap/rowset/segment_v2/inverted_index_cache.h"
 #include "olap/rowset/segment_v2/inverted_index_desc.h"
 #include "olap/rowset/segment_v2/inverted_index_file_writer.h"
@@ -165,8 +164,8 @@ public:
         Status st = io::global_local_filesystem()->create_file(file_path, &file_writer, &opts);
         ASSERT_TRUE(st.ok()) << st.msg();
 
-        // Create InvertedIndexFileWriter
-        auto writer = std::make_unique<InvertedIndexFileWriter>(
+        // Create IndexFileWriter
+        auto writer = std::make_unique<IndexFileWriter>(
                 io::global_local_filesystem(), index_path_prefix, "test_rowset", 0,
                 InvertedIndexStorageFormatPB::V2, std::move(file_writer));
 

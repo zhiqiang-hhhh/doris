@@ -26,8 +26,8 @@
 
 #include "common/status.h"
 #include "olap/column_predicate.h"
+#include "olap/rowset/segment_v2/index_reader.h"
 #include "olap/rowset/segment_v2/inverted_index_query_type.h"
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
 #include "runtime/define_primitive_type.h"
 #include "runtime/primitive_type.h"
 #include "vec/columns/column.h"

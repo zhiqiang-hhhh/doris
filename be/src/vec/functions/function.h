@@ -31,7 +31,7 @@
 #include "common/exception.h"
 #include "common/logging.h"
 #include "common/status.h"
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
+#include "olap/rowset/segment_v2/index_reader.h"
 #include "udf/udf.h"
 #include "vec/core/block.h"
 #include "vec/core/column_numbers.h"

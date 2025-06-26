@@ -44,9 +44,9 @@
 #include "olap/rowset/segment_v2/bloom_filter.h"
 #include "olap/rowset/segment_v2/bloom_filter_index_reader.h"
 #include "olap/rowset/segment_v2/encoding_info.h" // for EncodingInfo
-#include "olap/rowset/segment_v2/inverted_index/analyzer/analyzer.h"
 #include "olap/rowset/segment_v2/index_file_reader.h"
-#include "olap/rowset/segment_v2/inverted_index_reader.h"
+#include "olap/rowset/segment_v2/index_reader.h"
+#include "olap/rowset/segment_v2/inverted_index/analyzer/analyzer.h"
 #include "olap/rowset/segment_v2/page_decoder.h"
 #include "olap/rowset/segment_v2/page_handle.h" // for PageHandle
 #include "olap/rowset/segment_v2/page_io.h"
