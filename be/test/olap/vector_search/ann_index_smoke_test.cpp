@@ -76,7 +76,8 @@ protected:
                 {segment_v2::AnnIndexColumnWriter::MAX_DEGREE, "32"}};
 
         EXPECT_CALL(*_index_meta, properties()).WillOnce(testing::ReturnRef(properties));
-        _ann_index_col_writer = std::make_unique<segment_v2::AnnIndexColumnWriter>(_index_file_writer.get(), _index_meta.get());
+        _ann_index_col_writer = std::make_unique<segment_v2::AnnIndexColumnWriter>(
+                _index_file_writer.get(), _index_meta.get());
         EXPECT_TRUE(_ann_index_col_writer->init().ok());
     }
 

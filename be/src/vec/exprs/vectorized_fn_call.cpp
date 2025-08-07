@@ -562,7 +562,8 @@ Status VectorizedFnCall::evaluate_ann_range_search(
             for (size_t i = 0; i < size; ++i) {
                 dst[i] = static_cast<double>(src[i]);
             }
-            auto nullable_distance_col = ColumnNullable::create(std::move(distance_col), std::move(null_map));
+            auto nullable_distance_col =
+                    ColumnNullable::create(std::move(distance_col), std::move(null_map));
             virtual_column_iterator->prepare_materialization(std::move(nullable_distance_col),
                                                              std::move(result.row_ids));
         } else {
