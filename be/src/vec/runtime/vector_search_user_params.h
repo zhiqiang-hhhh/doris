@@ -23,7 +23,7 @@ namespace doris {
 #include "common/compile_check_begin.h"
 // Constructed from session variables.
 struct VectorSearchUserParams {
-    int hnsw_ef_search = 16;
+    int hnsw_ef_search = 32;
     bool hnsw_check_relative_distance = true;
     bool hnsw_bounded_queue = true;
 
