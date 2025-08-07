@@ -202,9 +202,6 @@ public class OlapScanNode extends ScanNode {
     private SortInfo scoreSortInfo = null;
     private long scoreSortLimit = -1;
 
-    private SortInfo scoreSortInfo = null;
-    private long scoreSortLimit = -1;
-
     // cached for prepared statement to quickly prune partition
     // only used in short circuit plan at present
     private final PartitionPruneV2ForShortCircuitPlan cachedPartitionPruner =
