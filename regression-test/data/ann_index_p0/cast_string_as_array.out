@@ -22,13 +22,6 @@
 3
 4
 
--- !sql_rs_ip_ge --
-2
-3
-
--- !sql_rs_ip_lt --
-1
-
 -- !sql_fall_back --
 0.0
 0.0

@@ -465,6 +465,7 @@ void VectorizedFnCall::prepare_ann_range_search(
         return;
     }
 
+    // Nullable<Array<Float32>> or Array<Float32>
     auto col_ptr = column_wrapper->column_ptr->convert_to_full_column_if_const();
     const IColumn* top_col = col_ptr.get();
     // Unwrap outer nullable if any ...
@@ -477,17 +478,7 @@ void VectorizedFnCall::prepare_ann_range_search(
         array_holder_col = &nullable_top->get_nested_column();
     }
 
-    const auto* array_col = check_and_get_column<ColumnArray>(*array_holder_col);
-    if (array_col == nullptr) {
-        suitable_for_ann_index = false;
-        return;
-    }
-
-    if (array_col->size() != 1) {
-        suitable_for_ann_index = false; // should be single array literal
-        return;
-    }
-
+    const ColumnArray* array_col = assert_cast<const ColumnArray*>(array_holder_col);
     const IColumn& nested_data_any = array_col->get_data();
     const IColumn* values_holder_col = &nested_data_any;
     size_t value_count = array_col->get_offsets()[0];
@@ -502,12 +493,7 @@ void VectorizedFnCall::prepare_ann_range_search(
         }
         values_holder_col = &values_nullable->get_nested_column();
     }
-    const auto* value_col = check_and_get_column<ColumnFloat32>(*values_holder_col);
-    if (value_col == nullptr) {
-        suitable_for_ann_index = false; // elements must be Float32
-        return;
-    }
-
+    const auto* value_col = assert_cast<const ColumnFloat32*>(values_holder_col);
     range_search_runtime.dim = value_count;
     range_search_runtime.query_value = std::make_unique<float[]>(value_count);
     const auto& data_ref = value_col->get_data();

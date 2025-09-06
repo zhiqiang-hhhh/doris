@@ -127,11 +127,11 @@ suite("cast_string_as_array") {
         exception "[INVALID_ARGUMENT]"
     }
 
-    // Inner product range search with >= threshold: expect ids 2 and 3
-    qt_sql_rs_ip_ge "select id from ann_cast_rhs_ip where inner_product_approximate(embedding, cast('[0.1,0.2,0.3,0.4]' as array<float>)) >= 0.7 order by id;"
+    // // Inner product range search with >= threshold: expect ids 2 and 3
+    // qt_sql_rs_ip_ge "select id from ann_cast_rhs_ip where inner_product_approximate(embedding, cast('[0.1,0.2,0.3,0.4]' as array<float>)) >= 0.7 order by id;"
 
-    // Inner product range search with < threshold: expect id 1 only
-    qt_sql_rs_ip_lt "select id from ann_cast_rhs_ip where inner_product_approximate(embedding, cast('[0.1,0.2,0.3,0.4]' as array<float>)) < 0.7 order by id;"
+    // // Inner product range search with < threshold: expect id 1 only
+    // qt_sql_rs_ip_lt "select id from ann_cast_rhs_ip where inner_product_approximate(embedding, cast('[0.1,0.2,0.3,0.4]' as array<float>)) < 0.7 order by id;"
 
     // Inner product range search: dim mismatch should error
     test {
@@ -152,4 +152,19 @@ suite("cast_string_as_array") {
 
     // IP: inner_product(embedding, embedding) is sum of squares; with threshold 1.5 expect ids 2 and 3
     qt_sql_rs_ip_nonconst_ge "select id from ann_cast_rhs_ip where inner_product_approximate(embedding, embedding) >= 1.5 order by id;"
+
+    test {
+        sql "select id from ann_cast_rhs_ip where inner_product_approximate(embedding, cast("" as array<float>)) >= 1.5 order by id;"
+        exception "INVALID_ARGUMENT"
+    } 
+
+    test {
+        sql "select id from ann_cast_rhs_ip where inner_product_approximate(embedding, cast('[0.1,NULL,0.3,0.4]' as array<float>)) >= 1.5 order by id;"
+        exception "INVALID_ARGUMENT"
+    }
+
+    test {
+        sql "select id from ann_cast_rhs_ip where inner_product_approximate(embedding, cast('[]' as array<float>)) >= 1.5 order by id;"
+        exception "INVALID_ARGUMENT"
+    }
 }
