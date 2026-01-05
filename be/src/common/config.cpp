@@ -421,7 +421,8 @@ DEFINE_mBool(disable_auto_compaction, "false");
 // whether enable vertical compaction
 DEFINE_mBool(enable_vertical_compaction, "true");
 // whether enable ordered data compaction
-DEFINE_mBool(enable_ordered_data_compaction, "true");
+// ordered data compaction will make new rowset broken when create index is executed, so it is disabled by default.
+DEFINE_mBool(enable_ordered_data_compaction, "false");
 // In vertical compaction, column number for every group
 DEFINE_mInt32(vertical_compaction_num_columns_per_group, "5");
 // In vertical compaction, max memory usage for row_source_buffer
