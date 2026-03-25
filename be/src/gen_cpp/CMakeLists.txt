@@ -18,7 +18,8 @@
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_DIR}/src/gen_cpp")
 
-set (GEN_CPP_DIR ${GENSRC_DIR}/gen_cpp)
+# Use the CMake-generated sources directory
+set (GEN_CPP_DIR ${GENSRC_GEN_CPP_DIR})
 file(GLOB SRC_FILES CONFIGURE_DEPENDS
     ${GEN_CPP_DIR}/*.cpp
     ${GEN_CPP_DIR}/*.cc
@@ -29,6 +30,9 @@ add_compile_options(-Wno-return-type)
 # keep everything in one library, the object files reference 
 # each other
 add_library(DorisGen STATIC ${SRC_FILES})
+
+# Ensure gensrc is built before compiling this library
+add_dependencies(DorisGen gensrc)
 
 if (COMPILER_CLANG)
     target_compile_options(DorisGen PRIVATE

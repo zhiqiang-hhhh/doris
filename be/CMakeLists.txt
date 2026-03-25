@@ -165,13 +165,14 @@ set(CMAKE_SKIP_RPATH TRUE)
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
 
-# Compile generated source if necessary
-message(STATUS "build gensrc if necessary")
-execute_process(COMMAND make -C ${BASE_DIR}/../gensrc/
-                RESULT_VARIABLE MAKE_GENSRC_RESULT)
-if(NOT ${MAKE_GENSRC_RESULT} EQUAL 0 AND NOT APPLE)
-    message(FATAL_ERROR "Failed to build ${BASE_DIR}/../gensrc/")
-endif()
+# Find Python for gensrc generation
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+# Build version information for gensrc
+include(cmake/build_version.cmake)
+
+# Include gensrc generation module (replaces legacy make-based approach)
+include(cmake/gensrc.cmake)
 
 # Set Boost
 set(Boost_DEBUG FALSE)
