@@ -1,0 +1,22 @@
+fe/fe-core/src/main/java/org/apache/doris/nereids/rules/rewrite/PushDownScoreTopNIntoOlapScan.java
+  s_c1237058ca51ce::t_47106c28c5ca62 21,123-127
+  s_c1237058ca51ce::t_97fdc3660c0d35 128-129
+regression-test/suites/inverted_index_p0/test_score_on_agg_mor_table.groovy
+  s_c1237058ca51ce::t_47106c28c5ca62 1-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "af0b81ae4fd15ea34b1a972a0a63de5febe95f1d",
+  "prompts": {},
+  "sessions": {
+    "s_c1237058ca51ce": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a08902-11bd-7380-88cf-28121067e95f",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "zhiqiang-hhhh <seuhezhiqiang@163.com>"
+    }
+  }
+}
